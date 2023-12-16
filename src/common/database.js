@@ -13,6 +13,9 @@ const GET_DATA = {
 	bffarinelli,
 	transmetall,
 }
+const LOGS_DIR_NAME = path.join('dist', 'logs');
+
+mkdirIfNotExistsSync(LOGS_DIR_NAME);
 
 export async function createDataBase() {
 	try {
@@ -23,6 +26,7 @@ export async function createDataBase() {
 
 			getData.currentItem = 0;
 			getData.items = new Map();
+			getData.itemsNoArticle = new Set();
 
 			console.log(`\n[${catalogue.name}]`);
 
@@ -41,6 +45,7 @@ async function createXLSX(dataGenerator, fileName, getData) {
 	const filePath = path.join('dist', fileName + dateString + '.xlsx');
 	const workbook = new ExcelJS.Workbook();
 	const sheet = workbook.addWorksheet(fileName);
+	const logsSheet = workbook.addWorksheet('logs');
 	const autoWidthColumns = {
 		'url': 10,
 		'article': 10,
@@ -79,13 +84,15 @@ async function createXLSX(dataGenerator, fileName, getData) {
 			continue;
 		}
 
-		sheet.addRow(item);
-
 		if (articles.has(article)) {
 			console.log(`Повторяющийся артикул в строке ${getData.currentItem + 1}: ${article}, url: ${item.url}\n`);
+			getData.itemsNoArticle.add(item.url);
 		} else {
 			articles.add(article);
 		}
+
+		sheet.addRow(item);
+		if (getData.itemsNoArticle.has(item.url)) logsSheet.addRow(item);
 
 		for (const id in autoWidthColumns) {
 			const currentLength = item[id].toString().length;

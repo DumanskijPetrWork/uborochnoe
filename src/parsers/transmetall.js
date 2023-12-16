@@ -3,11 +3,11 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 import { p } from '../common/puppeteer.js';
-import { delay, getCatalogueParams, downloadMedia, formatPrice, noArticle } from '../common/functions.js';
+import { delay, getCatalogueParams, downloadMedia, formatPrice, noArticle, formatDescription } from '../common/functions.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
-const { CATALOGUE_NAME, CATALOGUE, ORIGIN_URL } = getCatalogueParams(__filename);
+const { CATALOGUE, ORIGIN_URL } = getCatalogueParams(__filename);
 
 export async function* getData(url) {
 	for await (const cardURL of getCardURL(url)) {
@@ -19,16 +19,30 @@ export async function* getData(url) {
 			const pageContent = await p.getPageContent(fullURL);
 			const $ = cheerio.load(pageContent);
 
-			const name = $('h1.item-box__h1')?.text()?.trim() || '';
-			const article = $('div.item-aside div.item-box__article')?.first()?.text()?.trim() || noArticle(name, getData.currentItem + 2, fullURL);
-			const price = $('div.item-box__price span')?.text()?.trim() || '';
-			const category = $('ul.breadcrumbs span[itemprop="name"]')?.eq(-2)?.text()?.trim() || '';
-			const description = $('div.item-content.offset-top div.item-content__description')?.parent()?.html() || '';
+			const name = $('h1.item-box__h1')
+				?.text()
+				?.trim() || '';
+			const article = CATALOGUE.articles.get(fullURL) || $('div.item-aside div.item-box__article')
+				?.first()
+				?.text()
+				?.trim() || noArticle(name, getData.currentItem + 2, fullURL, getData);
+			const price = $('div.item-box__price span')
+				?.text()
+				?.trim() || '';
+			const category = $('ul.breadcrumbs span[itemprop="name"]')
+				?.eq(-2)
+				?.text()
+				?.trim() || '';
+			const description = $('div.item-content.offset-top div.item-content__description')
+				?.parent()
+				?.html()
+				?.trim() || '';
 			const properties = $('div.item-content.offset-top table.item-content__params')
 				?.eq(-1)
 				?.parent()
 				?.not('.item-pane')
-				?.html() || '';
+				?.html()
+				?.trim() || '';
 			const images = $('div.item-image__main div#splide01')
 				?.find('li.splide__slide')
 				?.not('.video-slide')
@@ -42,7 +56,7 @@ export async function* getData(url) {
 				const fileName = `${article.replace(/\//g, "-")}__${i++}` + path.extname(imageURL);
 
 				imagesfileNames.push(fileName);
-				downloadMedia(imageURL, 'media_' + CATALOGUE_NAME, fileName);
+				downloadMedia(imageURL, 'media_' + CATALOGUE.name, fileName);
 			}
 
 			await delay(500);
@@ -56,8 +70,8 @@ export async function* getData(url) {
 					price: formatPrice(price),
 					category,
 					name,
-					description,
-					properties,
+					description: formatDescription(description),
+					properties: formatDescription(properties),
 					images: imagesfileNames.join(),
 				}
 			} else {

@@ -3,11 +3,11 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 import { p } from '../common/puppeteer.js';
-import { delay, getCatalogueParams, downloadMedia, formatPrice, noArticle } from '../common/functions.js';
+import { delay, getCatalogueParams, downloadMedia, formatPrice, noArticle, formatDescription } from '../common/functions.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
-const { CATALOGUE_NAME, CATALOGUE, ORIGIN_URL } = getCatalogueParams(__filename);
+const { CATALOGUE, ORIGIN_URL } = getCatalogueParams(__filename);
 
 export async function* getData(url) {
 	for await (const cardURL of getCardURL(url)) {
@@ -30,12 +30,20 @@ export async function* getData(url) {
 			const pageContent = await p.getPageContent(fullURL);
 			const $ = cheerio.load(pageContent);
 
-			const name = $('h1#pagetitle')?.text() || '';
-			const article = $('span.article span.js-replace-article')?.first()?.text() || noArticle(name, getData.currentItem + 2, fullURL);
-			const price = $('div.catalog-detail__right-info span.price__new-val')?.attr('content') || '';
+			const name = $('h1#pagetitle')
+				?.text() || '';
+			const article = CATALOGUE.articles.get(fullURL) || $('span.article span.js-replace-article')
+				?.first()
+				?.text() || noArticle(name, getData.currentItem + 2, fullURL, getData);
+			const price = $('div.catalog-detail__right-info span.price__new-val')
+				?.attr('content') || '';
 			// const category = $('div#navigation span.breadcrumbs__item-name')?.eq(-2)?.text() || '';
-			const description = $('div#desc div.content')?.html() || '';
-			const properties = $('div#char div.props_block')?.html() || '';
+			const description = $('div#desc div.content')
+				?.html()
+				?.trim() || '';
+			const properties = $('div#char div.props_block')
+				?.html()
+				?.trim() || '';
 			const images = $('div.owl-stage')
 				?.first()
 				?.find('a')
@@ -48,7 +56,7 @@ export async function* getData(url) {
 				const fileName = `${article.replace(/\//g, "-")}__${i++}` + path.extname(imageURL);
 
 				imagesfileNames.push(fileName);
-				downloadMedia(ORIGIN_URL + imageURL, 'media_' + CATALOGUE_NAME, fileName);
+				downloadMedia(ORIGIN_URL + imageURL, 'media_' + CATALOGUE.name, fileName);
 			}
 
 			await delay(500);
@@ -63,8 +71,8 @@ export async function* getData(url) {
 					price: formatPrice(price),
 					category: getCategoryURL.currentCategoryName,
 					name,
-					description,
-					properties,
+					description: formatDescription(description),
+					properties: formatDescription(properties),
 					images: imagesfileNames.join(),
 				}
 			} else {

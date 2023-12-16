@@ -19,15 +19,16 @@ export function getCatalogueParams(catalogueName) {
 	const CATALOGUE = config.CATALOGUES.find(catalogue => catalogue.name === CATALOGUE_NAME);
 	const ORIGIN_URL = new URL(CATALOGUE.url).origin;
 
-	return { CATALOGUE_NAME, CATALOGUE, ORIGIN_URL };
+	return { CATALOGUE, ORIGIN_URL };
 }
 
-export function noArticle(rawArticle, lineNumber, url) {
+export function noArticle(rawArticle, lineNumber, url, getData) {
 	const regexp = /\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)|\b[A-Z\d]+\b/g;
 	const regexpExclude = /\b[A-Z]+\b|\b[\d]+(W|L|P|A|V)?\b|\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)/;
 	const article = rawArticle.match(regexp)?.filter(str => !regexpExclude.test(str))[0] || rawArticle;
 
 	console.log(`Товар без артикула (строка: ${lineNumber}, вычислено: ${article}, источник: ${rawArticle}):\n${url}\n`);
+	getData.itemsNoArticle.add(url);
 
 	return article;
 }
@@ -42,6 +43,13 @@ export function formatPrice(priceString) {
 	let n = (price > 1000) ? 100 : 10;
 
 	return Math.ceil(price / n) * n;
+}
+
+export function formatDescription(rawDescription) {
+	const regexp = /<(h[1-6]).*>\s*Описание\s*<\/\1>\s*/gi;
+	const description = rawDescription.replace(regexp, '').replace(/\t/g, '');
+
+	return description;
 }
 
 export async function downloadMedia(url, dirName, fileName) {
