@@ -39,7 +39,7 @@ export async function* getData(url) {
 
 			let i = 0;
 			for (const imageURL of images) {
-				const fileName = `${article.replace(/\//g, "'")}__${i++}` + path.extname(imageURL);
+				const fileName = `${article.replace(/\//g, "-")}__${i++}` + path.extname(imageURL);
 
 				imagesfileNames.push(fileName);
 				downloadMedia(imageURL, 'media_' + CATALOGUE_NAME, fileName);
@@ -79,7 +79,7 @@ async function* getCardURL(url) {
 				.find('div.element-content a');
 			const cardsURLs = cards
 				.map((i, elem) => $(elem).attr('href'))
-				.filter((i, elem) => !CATALOGUE.exceptions.includes(elem))
+				.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
 				.toArray();
 
 			for (const url of cardsURLs) {

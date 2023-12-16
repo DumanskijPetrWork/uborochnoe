@@ -5,12 +5,21 @@ export const config = {
 		{
 			name: "bffarinelli",
 			url: "https://bffarinelli.com/sitemap/",
-			exceptions: ["/product/aksessuary/"],
+			exceptions: new Set([
+				"/product/aksessuary/",
+			]),
+			articles: new Map([
+				[],
+			]),
 		},
 		{
 			name: "transmetall",
 			url: "https://www.transmetall.ru/catalog/all-bieffe?limit=30",
-			exceptions: []
+			exceptions: new Set([
+			]),
+			articles: new Map([
+				[],
+			]),
 		},
 	],
 }
