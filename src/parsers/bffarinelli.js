@@ -13,9 +13,9 @@ export async function* getData(url) {
 	for await (const cardURL of getCardURL(url)) {
 		const fullURL = ORIGIN_URL + cardURL;
 
-		console.log(`[${getData.currentItem + 1}] ${fullURL}`);
+		console.log(`[${CACHE.currentItem + 1}] ${fullURL}`);
 
-		if (getData.items.has(fullURL)) {
+		if (CACHE.items.has(fullURL)) {
 			console.log(`Новая категория для товара: ${fullURL}\n`);
 
 			yield {
@@ -34,7 +34,7 @@ export async function* getData(url) {
 				?.text() || '';
 			const article = CATALOGUE.articles.get(fullURL) || $('span.article span.js-replace-article')
 				?.first()
-				?.text() || noArticle(name, getData.currentItem + 2, fullURL, getData);
+				?.text() || noArticle(name, CACHE.currentItem + 2, fullURL);
 			const price = $('div.catalog-detail__right-info span.price__new-val')
 				?.attr('content') || '';
 			// const category = $('div#navigation span.breadcrumbs__item-name')?.eq(-2)?.text() || '';
@@ -59,11 +59,11 @@ export async function* getData(url) {
 				downloadMedia(ORIGIN_URL + imageURL, 'media_' + CATALOGUE.name, fileName);
 			}
 
-			await delay(500);
+			await delay(300);
 
 			if (name || article || price) {
-				getData.currentItem++;
-				getData.items.set(fullURL, getData.currentItem);
+				CACHE.currentItem++;
+				CACHE.items.set(fullURL, CACHE.currentItem);
 
 				yield {
 					url: fullURL,

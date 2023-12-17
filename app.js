@@ -2,6 +2,11 @@ import { p } from './src/common/puppeteer.js'
 import { createDataBase } from './src/common/database.js'
 
 
+global.CACHE = {
+	currentItem: 0,
+	items: new Map(),
+	itemsNoArticle: new Set()
+};
 await main();
 
 async function main() {

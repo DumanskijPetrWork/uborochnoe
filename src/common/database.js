@@ -13,32 +13,28 @@ const GET_DATA = {
 	bffarinelli,
 	transmetall,
 }
-const LOGS_DIR_NAME = path.join('dist', 'logs');
-
-mkdirIfNotExistsSync(LOGS_DIR_NAME);
 
 export async function createDataBase() {
 	try {
 		for (const catalogue of config.CATALOGUES) {
-			const getData = GET_DATA[catalogue.name];
-			const dataGenerator = getData(catalogue.url);
+			const dataGenerator = GET_DATA[catalogue.name](catalogue.url);
 			const MEDIA_DIR_NAME = path.join('dist', 'media_' + catalogue.name);
 
-			getData.currentItem = 0;
-			getData.items = new Map();
-			getData.itemsNoArticle = new Set();
+			CACHE.currentItem = 0;
+			CACHE.items = new Map();
+			CACHE.itemsNoArticle = new Set();
 
 			console.log(`\n[${catalogue.name}]`);
 
 			mkdirIfNotExistsSync(MEDIA_DIR_NAME);
-			await createXLSX(dataGenerator, catalogue.name, getData);
+			await createXLSX(dataGenerator, catalogue.name);
 		}
 	} catch (e) {
 		console.log(`Ошибка ${createDataBase.name}: ${e}`);
 	}
 }
 
-async function createXLSX(dataGenerator, fileName, getData) {
+async function createXLSX(dataGenerator, fileName) {
 	const articles = new Set();
 	const date = new Date();
 	const dateString = `_${date.getDate()}_${date.getMonth() + 1}_${date.getFullYear()}`;
@@ -65,12 +61,14 @@ async function createXLSX(dataGenerator, fileName, getData) {
 		{ header: 'properties', key: 'properties', width: 10 },
 		{ header: 'images', key: 'images' }
 	];
+	logsSheet.columns = sheet.columns;
 
+	// let i = 1;
 	for await (const item of dataGenerator) {
 		const article = item.article;
 
 		if (article === undefined) {
-			const row = getData.items.get(item.url) + 1;
+			const row = CACHE.items.get(item.url) + 1;
 			const cell = sheet.getRow(row).getCell('category');
 
 			cell.value += `,${item.category}`;
@@ -85,14 +83,14 @@ async function createXLSX(dataGenerator, fileName, getData) {
 		}
 
 		if (articles.has(article)) {
-			console.log(`Повторяющийся артикул в строке ${getData.currentItem + 1}: ${article}, url: ${item.url}\n`);
-			getData.itemsNoArticle.add(item.url);
+			console.log(`Повторяющийся артикул в строке ${CACHE.currentItem + 1}: ${article}, url: ${item.url}\n`);
+			CACHE.itemsNoArticle.add(item.url);
 		} else {
 			articles.add(article);
 		}
 
 		sheet.addRow(item);
-		if (getData.itemsNoArticle.has(item.url)) logsSheet.addRow(item);
+		if (CACHE.itemsNoArticle.has(item.url)) logsSheet.addRow(item);
 
 		for (const id in autoWidthColumns) {
 			const currentLength = item[id].toString().length;
@@ -101,13 +99,19 @@ async function createXLSX(dataGenerator, fileName, getData) {
 				autoWidthColumns[id] = currentLength;
 			}
 		}
+
+		// if (i++ >= 10) break; // TODO
 	}
 
 	for (const id in autoWidthColumns) {
 		const column = sheet.getColumn(id);
-		column.width = autoWidthColumns[id];
+		const logsColumn = logsSheet.getColumn(id);
+		const width = autoWidthColumns[id];
+
+		column.width = width;
+		logsColumn.width = width;
 	}
 
 	await workbook.xlsx.writeFile(filePath);
-	console.log(`\nОбработано уникальных товаров для каталога ${fileName}: ${getData.currentItem}`);
+	console.log(`\nОбработано уникальных товаров для каталога ${fileName}: ${CACHE.currentItem}`);
 }

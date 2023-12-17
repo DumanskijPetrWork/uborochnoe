@@ -13,7 +13,7 @@ export async function* getData(url) {
 	for await (const cardURL of getCardURL(url)) {
 		const fullURL = ORIGIN_URL + cardURL;
 
-		console.log(`[${getData.currentItem + 1}] ${fullURL}`);
+		console.log(`[${CACHE.currentItem + 1}] ${fullURL}`);
 
 		try {
 			const pageContent = await p.getPageContent(fullURL);
@@ -25,7 +25,7 @@ export async function* getData(url) {
 			const article = CATALOGUE.articles.get(fullURL) || $('div.item-aside div.item-box__article')
 				?.first()
 				?.text()
-				?.trim() || noArticle(name, getData.currentItem + 2, fullURL, getData);
+				?.trim() || noArticle(name, CACHE.currentItem + 2, fullURL);
 			const price = $('div.item-box__price span')
 				?.text()
 				?.trim() || '';
@@ -59,10 +59,10 @@ export async function* getData(url) {
 				downloadMedia(imageURL, 'media_' + CATALOGUE.name, fileName);
 			}
 
-			await delay(500);
+			await delay(300);
 
 			if (name || article || price) {
-				getData.currentItem++;
+				CACHE.currentItem++;
 
 				yield {
 					url: fullURL,

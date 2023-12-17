@@ -22,13 +22,13 @@ export function getCatalogueParams(catalogueName) {
 	return { CATALOGUE, ORIGIN_URL };
 }
 
-export function noArticle(rawArticle, lineNumber, url, getData) {
+export function noArticle(rawArticle, lineNumber, url) {
 	const regexp = /\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)|\b[A-Z\d]+\b/g;
 	const regexpExclude = /\b[A-Z]+\b|\b[\d]+(W|L|P|A|V)?\b|\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)/;
 	const article = rawArticle.match(regexp)?.filter(str => !regexpExclude.test(str))[0] || rawArticle;
 
 	console.log(`Товар без артикула (строка: ${lineNumber}, вычислено: ${article}, источник: ${rawArticle}):\n${url}\n`);
-	getData.itemsNoArticle.add(url);
+	CACHE.itemsNoArticle.add(url);
 
 	return article;
 }
