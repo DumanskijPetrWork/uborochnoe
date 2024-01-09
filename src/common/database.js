@@ -9,9 +9,9 @@ import lavorpro from '..//parsers/lavorpro.js';
 
 // Подключение парсеров
 const PARSERS = [
-	// bffarinelli,
+	bffarinelli,
 	transmetall,
-	// lavorpro,
+	lavorpro,
 ]
 
 export async function createDataBase() {
@@ -97,7 +97,7 @@ async function fillContent(dataGenerator, sheet, logsSheet) {
 				if (currentLength > autoWidthColumns[id]) autoWidthColumns[id] = currentLength;
 			}
 
-			if (i++ >= 4) break; // TODO ограничитель 45
+			// if (i++ >= 45) break;
 		}
 
 		for (const id in autoWidthColumns) {

@@ -12,11 +12,11 @@ const { CATALOGUE, ORIGIN_URL } = f.getCatalogueParams(__filename, config);
 export default {
 	config,
 	name: CATALOGUE.name,
-	dataGenerator: getData(CATALOGUE.url),
+	dataGenerator: getData(CATALOGUE.url, getCardURL),
 };
 
-async function* getData(url) {
-	for await (const cardURL of getCardURL(url)) {
+async function* getData(url, source) {
+	for await (const cardURL of source(url)) {
 		const fullURL = ORIGIN_URL + cardURL;
 
 		console.log(`[${CACHE.CURRENT.item + 1}] ${fullURL}`);
@@ -25,55 +25,31 @@ async function* getData(url) {
 			const pageContent = await p.getPageContent(fullURL);
 			const $ = cheerio.load(pageContent);
 
-			const name = $('h1.item-box__h1')
-				?.text()
-				?.trim() || '';
-			const article = CATALOGUE.articles.get(fullURL) || $('div.item-aside div.item-box__article')
-				?.first()
-				?.text()
-				?.trim() || f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
-			const price = $('div.item-box__price span')
-				?.text()
-				?.trim() || '';
-			const category = $('ul.breadcrumbs span[itemprop="name"]')
-				?.eq(-2)
-				?.text()
-				?.trim() || '';
-			const description = $('div.item-content.offset-top div.item-content__description')
-				?.parent()
-				?.html()
-				?.trim() || '';
-			const properties = $('div.item-content.offset-top table.item-content__params')
-				?.eq(-1)
-				?.parent()
-				?.not('.item-pane')
-				?.html()
-				?.trim() || '';
-			const images = $('div.item-image__main div#splide01')
-				?.find('li.splide__slide')
-				?.not('.video-slide')
-				?.find('img')
-				?.map((i, elem) => $(elem).attr('src').replace(/\?.*/, ''))
-				?.toArray() || [];
-			const imagesfileNames = f.downloadImages(images, article);
-
-			await f.delay(300);
+			const name = getName($);
+			const article = getArticle($, fullURL, name);
+			const price = f.formatPrice(getPrice($));
+			const category = getCategory($);
+			const description = f.formatDescription(getDescription($));
+			const properties = f.formatDescription(getProperties($));
+			const imagesfileNames = f.downloadImages(getImages($), article);
 
 			if (!(name || article || price)) {
 				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
 				continue;
 			}
 
-			CACHE.CURRENT.item++;
+			++CACHE.CURRENT.item;
+
+			await f.delay(300);
 
 			yield {
 				url: fullURL,
 				article,
-				price: f.formatPrice(price),
+				price,
 				category,
 				name,
-				description: f.formatDescription(description),
-				properties: f.formatDescription(properties),
+				description,
+				properties,
 				images: imagesfileNames.join(),
 			}
 		} catch (e) {
@@ -121,4 +97,64 @@ async function* getPageURL(url) {
 	} catch (e) {
 		console.log(`Ошибка ${getPageURL.name}: ${e}`);
 	}
+}
+
+function getName($) {
+	return $('h1.item-box__h1')
+		?.text()
+		?.trim()
+		|| '';
+}
+
+function getArticle($, fullURL, name) {
+	return CATALOGUE.articles.get(fullURL)
+		|| $('div.item-aside div.item-box__article')
+			?.first()
+			?.text()
+			?.trim()
+		|| f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
+}
+
+function getPrice($) {
+	return $('div.item-box__price span')
+		?.text()
+		?.trim()
+		|| '';
+}
+
+function getCategory($) {
+	return $('ul.breadcrumbs span[itemprop="name"]')
+		?.eq(-2)
+		?.text()
+		?.trim()
+		|| '';
+}
+
+function getDescription($) {
+	return $('div.item-content.offset-top div.item-content__description')
+		?.parent()
+		?.html()
+		?.trim()
+		|| '';
+}
+
+function getProperties($) {
+	return $('div.item-content.offset-top table.item-content__params')
+		?.eq(-1)
+		?.parent()
+		?.not('.item-pane')
+		?.html()
+		?.trim()
+		|| '';
+}
+
+function getImages($) {
+	// $('div.item-image__main div#splide01')
+	// 	?.find('li.splide__slide')
+	// 	?.not('.video-slide')
+	return $('div.item-image__main div.item-img')
+		?.find('img')
+		?.map((i, elem) => $(elem).attr('src').replace(/\?.*/, ''))
+		?.toArray()
+		|| [];
 }

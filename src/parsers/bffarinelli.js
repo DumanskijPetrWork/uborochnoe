@@ -36,28 +36,12 @@ async function* getData(url) {
 			const pageContent = await p.getPageContent(fullURL);
 			const $ = cheerio.load(pageContent);
 
-			const name = $('h1#pagetitle')
-				?.text() || '';
-			const article = CATALOGUE.articles.get(fullURL) || $('span.article span.js-replace-article')
-				?.first()
-				?.text() || f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
-			const price = $('div.catalog-detail__right-info span.price__new-val')
-				?.attr('content') || '';
-			// const category = $('div#navigation span.breadcrumbs__item-name')?.eq(-2)?.text() || '';
-			const description = $('div#desc div.content')
-				?.html()
-				?.trim() || '';
-			const properties = $('div#char div.props_block')
-				?.html()
-				?.trim() || '';
-			const images = $('div.owl-stage')
-				?.first()
-				?.find('a')
-				?.map((i, elem) => $(elem).attr('href'))
-				?.toArray() || [];
-			const imagesfileNames = f.downloadImages(images, article, ORIGIN_URL);
-
-			await f.delay(300);
+			const name = getName($);
+			const article = getArticle($, fullURL, name);
+			const price = f.formatPrice(getPrice($));
+			const description = f.formatDescription(getDescription($));
+			const properties = f.formatDescription(getProperties($));
+			const imagesfileNames = f.downloadImages(getImages($), article, ORIGIN_URL);
 
 			if (!(name || article || price)) {
 				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
@@ -66,14 +50,16 @@ async function* getData(url) {
 
 			CACHE.items.set(fullURL, ++CACHE.CURRENT.item);
 
+			await f.delay(300);
+
 			yield {
 				url: fullURL,
 				article,
-				price: f.formatPrice(price),
+				price,
 				category: CACHE.CURRENT.category,
 				name,
-				description: f.formatDescription(description),
-				properties: f.formatDescription(properties),
+				description,
+				properties,
 				images: imagesfileNames.join(),
 			}
 		} catch (e) {
@@ -147,4 +133,47 @@ async function* getCategoryURL(url) {
 	} catch (e) {
 		console.log(`Ошибка ${getCategoryURL.name}: ${e}`);
 	}
+}
+
+function getName($) {
+	return $('h1#pagetitle')
+		?.text()
+		|| '';
+}
+
+function getArticle($, fullURL, name) {
+	return CATALOGUE.articles.get(fullURL)
+		|| $('span.article span.js-replace-article')
+			?.first()
+			?.text()
+		|| f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
+}
+
+function getPrice($) {
+	return $('div.catalog-detail__right-info span.price__new-val')
+		?.attr('content')
+		|| '';
+}
+
+function getDescription($) {
+	return $('div#desc div.content')
+		?.html()
+		?.trim()
+		|| '';
+}
+
+function getProperties($) {
+	return $('div#char div.props_block')
+		?.html()
+		?.trim()
+		|| '';
+}
+
+function getImages($) {
+	return $('div.owl-stage')
+		?.first()
+		?.find('a')
+		?.map((i, elem) => $(elem).attr('href'))
+		?.toArray()
+		|| [];
 }
