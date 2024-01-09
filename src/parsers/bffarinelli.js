@@ -1,26 +1,32 @@
 import * as cheerio from 'cheerio';
 import { fileURLToPath } from 'url';
-import path from 'path';
 
 import { p } from '../common/puppeteer.js';
-import { delay, getCatalogueParams, downloadMedia, formatPrice, noArticle, formatDescription } from '../common/functions.js';
+import * as f from '../common/functions.js';
+import { config } from '../../config/config_biefe.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
-const { CATALOGUE, ORIGIN_URL } = getCatalogueParams(__filename);
+const { CATALOGUE, ORIGIN_URL } = f.getCatalogueParams(__filename, config);
 
-export async function* getData(url) {
+export default {
+	config,
+	name: CATALOGUE.name,
+	dataGenerator: getData(CATALOGUE.url),
+};
+
+async function* getData(url) {
 	for await (const cardURL of getCardURL(url)) {
 		const fullURL = ORIGIN_URL + cardURL;
 
-		console.log(`[${CACHE.currentItem + 1}] ${fullURL}`);
+		console.log(`[${CACHE.CURRENT.item + 1}] ${fullURL}`);
 
 		if (CACHE.items.has(fullURL)) {
 			console.log(`Новая категория для товара: ${fullURL}\n`);
 
 			yield {
 				url: fullURL,
-				category: getCategoryURL.currentCategoryName,
+				category: CACHE.CURRENT.category,
 			}
 
 			continue;
@@ -34,7 +40,7 @@ export async function* getData(url) {
 				?.text() || '';
 			const article = CATALOGUE.articles.get(fullURL) || $('span.article span.js-replace-article')
 				?.first()
-				?.text() || noArticle(name, CACHE.currentItem + 2, fullURL);
+				?.text() || f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
 			const price = $('div.catalog-detail__right-info span.price__new-val')
 				?.attr('content') || '';
 			// const category = $('div#navigation span.breadcrumbs__item-name')?.eq(-2)?.text() || '';
@@ -49,34 +55,26 @@ export async function* getData(url) {
 				?.find('a')
 				?.map((i, elem) => $(elem).attr('href'))
 				?.toArray() || [];
-			const imagesfileNames = [];
+			const imagesfileNames = f.downloadImages(images, article, ORIGIN_URL);
 
-			let i = 0;
-			for (const imageURL of images) {
-				const fileName = `${article.replace(/\//g, "-")}__${i++}` + path.extname(imageURL);
+			await f.delay(300);
 
-				imagesfileNames.push(fileName);
-				downloadMedia(ORIGIN_URL + imageURL, 'media_' + CATALOGUE.name, fileName);
+			if (!(name || article || price)) {
+				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
+				continue;
 			}
 
-			await delay(300);
+			CACHE.items.set(fullURL, ++CACHE.CURRENT.item);
 
-			if (name || article || price) {
-				CACHE.currentItem++;
-				CACHE.items.set(fullURL, CACHE.currentItem);
-
-				yield {
-					url: fullURL,
-					article,
-					price: formatPrice(price),
-					category: getCategoryURL.currentCategoryName,
-					name,
-					description: formatDescription(description),
-					properties: formatDescription(properties),
-					images: imagesfileNames.join(),
-				}
-			} else {
-				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
+			yield {
+				url: fullURL,
+				article,
+				price: f.formatPrice(price),
+				category: CACHE.CURRENT.category,
+				name,
+				description: f.formatDescription(description),
+				properties: f.formatDescription(properties),
+				images: imagesfileNames.join(),
 			}
 		} catch (e) {
 			console.log(`Ошибка ${getData.name} (url: ${fullURL}): ${e}`);
@@ -127,7 +125,7 @@ async function* getPageURL(url) {
 }
 
 async function* getCategoryURL(url) {
-	getCategoryURL.currentCategoryName = '';
+	CACHE.CURRENT.category = '';
 
 	try {
 		const pageContent = await p.getPageContent(url);
@@ -140,7 +138,7 @@ async function* getCategoryURL(url) {
 		for (const category of categories) {
 			const categoryURL = $(category).attr('href');
 
-			getCategoryURL.currentCategoryName = $(category).text();
+			CACHE.CURRENT.category = $(category).text();
 
 			if (!CATALOGUE.exceptions.has(categoryURL)) {
 				yield categoryURL;

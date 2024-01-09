@@ -1,19 +1,25 @@
 import * as cheerio from 'cheerio';
 import { fileURLToPath } from 'url';
-import path from 'path';
 
 import { p } from '../common/puppeteer.js';
-import { delay, getCatalogueParams, downloadMedia, formatPrice, noArticle, formatDescription } from '../common/functions.js';
+import * as f from '../common/functions.js';
+import { config } from '../../config/config_biefe.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
-const { CATALOGUE, ORIGIN_URL } = getCatalogueParams(__filename);
+const { CATALOGUE, ORIGIN_URL } = f.getCatalogueParams(__filename, config);
 
-export async function* getData(url) {
+export default {
+	config,
+	name: CATALOGUE.name,
+	dataGenerator: getData(CATALOGUE.url),
+};
+
+async function* getData(url) {
 	for await (const cardURL of getCardURL(url)) {
 		const fullURL = ORIGIN_URL + cardURL;
 
-		console.log(`[${CACHE.currentItem + 1}] ${fullURL}`);
+		console.log(`[${CACHE.CURRENT.item + 1}] ${fullURL}`);
 
 		try {
 			const pageContent = await p.getPageContent(fullURL);
@@ -25,7 +31,7 @@ export async function* getData(url) {
 			const article = CATALOGUE.articles.get(fullURL) || $('div.item-aside div.item-box__article')
 				?.first()
 				?.text()
-				?.trim() || noArticle(name, CACHE.currentItem + 2, fullURL);
+				?.trim() || f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
 			const price = $('div.item-box__price span')
 				?.text()
 				?.trim() || '';
@@ -49,33 +55,26 @@ export async function* getData(url) {
 				?.find('img')
 				?.map((i, elem) => $(elem).attr('src').replace(/\?.*/, ''))
 				?.toArray() || [];
-			const imagesfileNames = [];
+			const imagesfileNames = f.downloadImages(images, article);
 
-			let i = 0;
-			for (const imageURL of images) {
-				const fileName = `${article.replace(/\//g, "-")}__${i++}` + path.extname(imageURL);
+			await f.delay(300);
 
-				imagesfileNames.push(fileName);
-				downloadMedia(imageURL, 'media_' + CATALOGUE.name, fileName);
+			if (!(name || article || price)) {
+				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
+				continue;
 			}
 
-			await delay(300);
+			CACHE.CURRENT.item++;
 
-			if (name || article || price) {
-				CACHE.currentItem++;
-
-				yield {
-					url: fullURL,
-					article,
-					price: formatPrice(price),
-					category,
-					name,
-					description: formatDescription(description),
-					properties: formatDescription(properties),
-					images: imagesfileNames.join(),
-				}
-			} else {
-				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
+			yield {
+				url: fullURL,
+				article,
+				price: f.formatPrice(price),
+				category,
+				name,
+				description: f.formatDescription(description),
+				properties: f.formatDescription(properties),
+				images: imagesfileNames.join(),
 			}
 		} catch (e) {
 			console.log(`Ошибка ${getData.name} (url: ${fullURL}): ${e}`);

@@ -13,7 +13,7 @@ class PuppeteerHandler {
 	async initBrowser() {
 		try {
 			this.browser = await puppeteer.launch(LAUNCH_PUPPETEER_OPTS);
-			console.log('Puppeteer запущен');
+			console.log('* Puppeteer запущен *');
 		} catch (e) {
 			console.log(`Ошибка ${this.initBrowser.name}: ${e}`);
 		}
@@ -22,9 +22,9 @@ class PuppeteerHandler {
 	async closeBrowser() {
 		if (this.browser) {
 			await this.browser.close();
-			console.log('Puppeteer успешно завершил работу\n');
+			console.log('\n* Puppeteer успешно завершил работу *\n');
 		} else {
-			console.error('Puppeteer не использовался\n');
+			console.error('\n* Puppeteer не использовался *\n');
 		}
 	}
 

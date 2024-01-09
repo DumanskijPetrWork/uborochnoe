@@ -3,10 +3,24 @@ import { createDataBase } from './src/common/database.js'
 
 
 global.CACHE = {
-	currentItem: 0,
-	items: new Map(),
-	itemsNoArticle: new Set()
+	clear(all) {
+		this.CURRENT = {
+			DATA_DIR_NAME: '',
+			MEDIA_DIR_NAME: '',
+			category: '',
+			item: 0,
+		};
+
+		this.items = new Map();
+		this.itemsNoArticle = new Map();
+		this.articles = new Set();
+
+		if (all) {
+			this.relatedItems = new Set();
+		}
+	}
 };
+
 await main();
 
 async function main() {
