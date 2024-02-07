@@ -68,7 +68,10 @@ export function downloadImages(images, imageName, originURL = '') {
 
 	for (const imageURL of images) {
 		const fileName = cyrillicToTranslit(
-			`${imageName.replace(/\//g, "-")}__${i++}` +
+			`${imageName
+				.replace(/\//g, "-")
+				.replace(/[^-\w\d\s_.]/g, "")
+			}__${i++}` +
 			path.extname(imageURL));
 
 		imagesfileNames.push(fileName);

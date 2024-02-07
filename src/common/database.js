@@ -9,8 +9,8 @@ import lavorpro from '..//parsers/lavorpro.js';
 
 // Подключение парсеров
 const PARSERS = [
-	bffarinelli,
-	transmetall,
+	// bffarinelli,
+	// transmetall,
 	lavorpro,
 ]
 
