@@ -1,4 +1,3 @@
-import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { URL } from 'url';
@@ -12,12 +11,27 @@ export function delay(ms) {
 export function updateDirs(siteURL, catalogueName) {
 	const DATA_DIR_NAME = CACHE.CURRENT.DATA_DIR_NAME = path.join(
 		'dist',
-		new URL(siteURL).hostname);
+		new URL(siteURL).hostname,
+		catalogueName
+	);
 	const MEDIA_DIR_NAME = CACHE.CURRENT.MEDIA_DIR_NAME = path.join(
 		DATA_DIR_NAME,
-		'media_' + catalogueName);
+		'media',
+		currentDateString
+	);
+	const VARIATIONS_DIR_NAME = path.join(
+		DATA_DIR_NAME,
+		'variations'
+	);
 
-	mkdirIfNotExistsSync(DATA_DIR_NAME, MEDIA_DIR_NAME);
+	mkdirIfNotExistsSync(DATA_DIR_NAME, MEDIA_DIR_NAME, VARIATIONS_DIR_NAME);
+}
+
+export function changeFileName(filePath, suffix, extName) {
+	return path.join(
+		path.dirname(filePath),
+		`${path.basename(filePath, '.xlsx')}_${suffix}.${extName}`,
+	)
 }
 
 export function getCatalogueParams(parserName, config) {
@@ -28,15 +42,15 @@ export function getCatalogueParams(parserName, config) {
 	return { CATALOGUE, ORIGIN_URL };
 }
 
-export function noArticle(rawArticle, lineNumber, url) {
+export function noSKU(rawSKU, lineNumber, url) {
 	const regexp = /\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)|\b[A-Z\d]+\b/g;
 	const regexpExclude = /\b[A-Z]+\b|\b[\d]+(W|L|P|A|V)?\b|\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)/;
-	const article = rawArticle.match(regexp)?.filter(str => !regexpExclude.test(str))[0] || rawArticle;
+	const sku = rawSKU.match(regexp)?.filter(str => !regexpExclude.test(str))[0] || rawSKU;
 
-	console.log(`Товар без артикула (строка: ${lineNumber}, вычислено: ${article}, источник: ${rawArticle}):\n${url}\n`);
-	CACHE.itemsNoArticle.set(url, 'Нет артикула');
+	console.log(`Товар без артикула (строка: ${lineNumber}, вычислено: ${sku}, источник: ${rawSKU}):\n${url}\n`);
+	CACHE.itemsNoSKU.set(url, 'Нет артикула');
 
-	return article;
+	return sku;
 }
 
 export function formatPrice(priceString) {
@@ -62,49 +76,34 @@ export function formatDescription(rawDescription) {
 	return description;
 }
 
-export function downloadImages(images, imageName, originURL = '') {
-	const imagesfileNames = [];
-	let i = 0;
-
-	for (const imageURL of images) {
-		const fileName = cyrillicToTranslit(
-			`${imageName
-				.replace(/\//g, "-")
-				.replace(/[^-\w\d\s_.]/g, "")
-			}__${i++}` +
-			path.extname(imageURL));
-
-		imagesfileNames.push(fileName);
-		downloadMedia(originURL + imageURL, fileName);
-	}
-
-	return imagesfileNames;
-}
-
-async function downloadMedia(url, fileName) {
-	const dirName = CACHE.CURRENT.MEDIA_DIR_NAME;
-	const filePath = path.resolve(dirName, fileName);
-
-	try {
-		if (fs.existsSync(filePath)) return;
-
-		const response = await axios({
-			url,
-			responseType: 'stream',
-		});
-
-		response.data.pipe(fs.createWriteStream(filePath));
-	} catch (e) {
-		console.log(`Ошибка ${downloadMedia.name} (path: ${path.join(dirName, fileName)}, url: ${url}): ${e}`);
-	}
-}
-
-function cyrillicToTranslit(str) {
+export function cyrillicToTranslit(str) {
 	return new CyrillicToTranslit().transform(str, '_').toLowerCase();
+}
+
+export function clearImageName(str) {
+	return str
+		.replace(/\//g, "-")
+		.replace(/[^-\w\d\s_.]/g, "");
+}
+
+export function setCellsValues(worksheet, rowIndex, valuesByColumnsNames) {
+	const row = worksheet.getRow(rowIndex);
+
+	for (const [columnName, value] of Object.entries(valuesByColumnsNames)) {
+		row.getCell(columnName).value = value;
+	}
+}
+
+export const currentDateString = getCurrentDateString();
+
+function getCurrentDateString() {
+	const date = new Date();
+
+	return `${date.getDate()}_${date.getMonth() + 1}_${date.getFullYear()}`;
 }
 
 function mkdirIfNotExistsSync(...dirs) {
 	for (const dir of dirs) {
-		if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 	}
 }
