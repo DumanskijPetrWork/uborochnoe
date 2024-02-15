@@ -1,8 +1,9 @@
 import * as cheerio from 'cheerio';
 import { fileURLToPath } from 'url';
-
 import { p } from '../common/puppeteer.js';
 import * as f from '../common/functions.js';
+import * as m from '../common/media.js';
+
 import { config } from '../../config/config_biefe.js';
 
 
@@ -26,14 +27,14 @@ async function* getData(url, source) {
 			const $ = cheerio.load(pageContent);
 
 			const name = getName($);
-			const article = getArticle($, fullURL, name);
+			const sku = getSKU($, fullURL, name);
 			const price = f.formatPrice(getPrice($));
 			const category = getCategory($);
 			const description = f.formatDescription(getDescription($));
 			const properties = f.formatDescription(getProperties($));
-			const imagesfileNames = f.downloadImages(getImages($), article);
+			const imagesfileNames = m.downloadImages(getImages($), sku);
 
-			if (!(name || article || price)) {
+			if (!(name || sku || price)) {
 				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
 				continue;
 			}
@@ -44,7 +45,7 @@ async function* getData(url, source) {
 
 			yield {
 				url: fullURL,
-				article,
+				sku: sku,
 				price,
 				category,
 				name,
@@ -63,15 +64,8 @@ async function* getCardURL(url) {
 		try {
 			const pageContent = await p.getPageContent(pageURL);
 			const $ = cheerio.load(pageContent);
-			const cards = $('div[data-page]')
-				.first()
-				.find('div.element-content a');
-			const cardsURLs = cards
-				.map((i, elem) => $(elem).attr('href'))
-				.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
-				.toArray();
 
-			for (const url of cardsURLs) {
+			for (const url of getCardsURLs($)) {
 				yield url;
 			}
 		} catch (e) {
@@ -84,15 +78,9 @@ async function* getPageURL(url) {
 	try {
 		const pageContent = await p.getPageContent(url);
 		const $ = cheerio.load(pageContent);
-		const maxPageNumber = $('div.pagination')
-			?.children('a.pagination-item')
-			?.not('.navigation-item__arrow')
-			?.last()
-			?.text()
-			?.trim() || 1;
 
-		for (let n = 1; n <= maxPageNumber; n++) {
-			yield `${url}&page=${n}`;
+		for (let n = 1; n <= getMaxPageNumber($); n++) {
+			yield getLinkToPageN(url, n);
 		}
 	} catch (e) {
 		console.log(`Ошибка ${getPageURL.name}: ${e}`);
@@ -106,13 +94,13 @@ function getName($) {
 		|| '';
 }
 
-function getArticle($, fullURL, name) {
-	return CATALOGUE.articles.get(fullURL)
+function getSKU($, fullURL, name) {
+	return CATALOGUE.SKUs.get(fullURL)
 		|| $('div.item-aside div.item-box__article')
 			?.first()
 			?.text()
 			?.trim()
-		|| f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
+		|| f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
 }
 
 function getPrice($) {
@@ -157,4 +145,28 @@ function getImages($) {
 		?.map((i, elem) => $(elem).attr('src').replace(/\?.*/, ''))
 		?.toArray()
 		|| [];
+}
+
+function getCardsURLs($) {
+	const cards = $('div[data-page]')
+		.first()
+		.find('div.element-content a');
+
+	return cards
+		.map((i, elem) => $(elem).attr('href'))
+		.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
+		.toArray();
+}
+
+function getMaxPageNumber($) {
+	return $('div.pagination')
+		?.children('a.pagination-item')
+		?.not('.navigation-item__arrow')
+		?.last()
+		?.text()
+		?.trim() || 1;
+}
+
+function getLinkToPageN(originURL, n) {
+	return `${originURL}&page=${n}`;
 }

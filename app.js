@@ -12,8 +12,8 @@ global.CACHE = {
 		};
 
 		this.items = new Map();
-		this.itemsNoArticle = new Map();
-		this.articles = new Set();
+		this.itemsNoSKU = new Map();
+		this.SKUs = new Set();
 
 		if (all) {
 			this.relatedItems = new Set();

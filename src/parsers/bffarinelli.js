@@ -1,8 +1,9 @@
 import * as cheerio from 'cheerio';
 import { fileURLToPath } from 'url';
-
 import { p } from '../common/puppeteer.js';
 import * as f from '../common/functions.js';
+import * as m from '../common/media.js';
+
 import { config } from '../../config/config_biefe.js';
 
 
@@ -37,13 +38,13 @@ async function* getData(url) {
 			const $ = cheerio.load(pageContent);
 
 			const name = getName($);
-			const article = getArticle($, fullURL, name);
+			const sku = getSKU($, fullURL, name);
 			const price = f.formatPrice(getPrice($));
 			const description = f.formatDescription(getDescription($));
 			const properties = f.formatDescription(getProperties($));
-			const imagesfileNames = f.downloadImages(getImages($), article, ORIGIN_URL);
+			const imagesfileNames = m.downloadImages(getImages($), sku, ORIGIN_URL);
 
-			if (!(name || article || price)) {
+			if (!(name || sku || price)) {
 				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
 				continue;
 			}
@@ -54,7 +55,7 @@ async function* getData(url) {
 
 			yield {
 				url: fullURL,
-				article,
+				sku: sku,
 				price,
 				category: CACHE.CURRENT.category,
 				name,
@@ -73,14 +74,8 @@ async function* getCardURL(url) {
 		try {
 			const pageContent = await p.getPageContent(pageURL);
 			const $ = cheerio.load(pageContent);
-			const cards = $('div.catalog-items')
-				.find('div.catalog-block__info-title a');
-			const cardsURLs = cards
-				.map((i, elem) => $(elem).attr('href'))
-				.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
-				.toArray();
 
-			for (const url of cardsURLs) {
+			for (const url of getCardsURLs($)) {
 				yield url;
 			}
 		} catch (e) {
@@ -96,13 +91,9 @@ async function* getPageURL(url) {
 		try {
 			const pageContent = await p.getPageContent(fullURL);
 			const $ = cheerio.load(pageContent);
-			const maxPageNumber = $('div.module-pagination')
-				?.children('div.catalog-block__info-title a')
-				?.last()
-				?.text() || 1;
 
-			for (let n = 1; n <= maxPageNumber; n++) {
-				yield `${fullURL}?PAGEN_1=${n}`;
+			for (let n = 1; n <= getMaxPageNumber($); n++) {
+				yield getLinkToPageN(fullURL, n);
 			}
 		} catch (e) {
 			console.log(`Ошибка ${getPageURL.name}: ${e}`);
@@ -116,12 +107,8 @@ async function* getCategoryURL(url) {
 	try {
 		const pageContent = await p.getPageContent(url);
 		const $ = cheerio.load(pageContent);
-		const categories = $('ul.map-columns__dropdown')
-			.first()
-			.find('a')
-			.toArray();
 
-		for (const category of categories) {
+		for (const category of getCategories($)) {
 			const categoryURL = $(category).attr('href');
 
 			CACHE.CURRENT.category = $(category).text();
@@ -141,12 +128,12 @@ function getName($) {
 		|| '';
 }
 
-function getArticle($, fullURL, name) {
-	return CATALOGUE.articles.get(fullURL)
+function getSKU($, fullURL, name) {
+	return CATALOGUE.SKUs.get(fullURL)
 		|| $('span.article span.js-replace-article')
 			?.first()
 			?.text()
-		|| f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
+		|| f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
 }
 
 function getPrice($) {
@@ -176,4 +163,32 @@ function getImages($) {
 		?.map((i, elem) => $(elem).attr('href'))
 		?.toArray()
 		|| [];
+}
+
+function getCardsURLs($) {
+	const cards = $('div.catalog-items')
+		.find('div.catalog-block__info-title a');
+
+	return cards
+		.map((i, elem) => $(elem).attr('href'))
+		.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
+		.toArray();
+}
+
+function getMaxPageNumber($) {
+	return $('div.module-pagination')
+		?.children('div.catalog-block__info-title a')
+		?.last()
+		?.text() || 1;
+}
+
+function getLinkToPageN(originURL, n) {
+	return `${originURL}?PAGEN_1=${n}`;
+}
+
+function getCategories($) {
+	return $('ul.map-columns__dropdown')
+		.first()
+		.find('a')
+		.toArray();
 }

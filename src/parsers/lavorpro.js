@@ -1,8 +1,9 @@
 import * as cheerio from 'cheerio';
 import { fileURLToPath } from 'url';
-
 import { p } from '../common/puppeteer.js';
 import * as f from '../common/functions.js';
+import * as m from '../common/media.js';
+
 import { config } from '../../config/config_lavor.js';
 
 
@@ -38,17 +39,17 @@ async function* getData(url, source) {
 			const $ = cheerio.load(pageContent);
 
 			const name = getName($);
-			const article = getArticle($, fullURL, name);
+			const sku = getSKU($, fullURL, name);
 			const price = f.formatPrice(getPrice($));
 			const description = f.formatDescription(getDescription($));
 			const properties = f.formatDescription(getProperties($));
-			const imagesfileNames = f.downloadImages(getImages($), article, ORIGIN_URL);
+			const imagesfileNames = m.downloadImages(getImages($), sku, ORIGIN_URL);
 			const relatedAccessories = getRelatedAccessories($);
-			const relatedAccessoriesArticles = getRelatedAccessoriesArticles($, relatedAccessories);
+			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($, relatedAccessories);
 
 			addRelatedItems($, relatedAccessories);
 
-			if (!(name || article || price)) {
+			if (!(name || sku || price)) {
 				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
 				continue;
 			}
@@ -59,14 +60,14 @@ async function* getData(url, source) {
 
 			yield {
 				url: fullURL,
-				article,
+				sku: sku,
 				price,
 				category: CACHE.CURRENT.category,
 				name,
 				description,
 				properties,
 				images: imagesfileNames.join(),
-				related: relatedAccessoriesArticles.join(),
+				related: relatedAccessoriesSKUs.join(),
 			}
 		} catch (e) {
 			console.log(`Ошибка ${getData.name} (url: ${fullURL}): ${e}`);
@@ -87,13 +88,13 @@ async function* getRelatedData(source) {
 			if (getCategory($) !== 'Каталог') continue;
 
 			const name = getName($);
-			const article = getArticle($, fullURL, name);
+			const sku = getSKU($, fullURL, name);
 			const price = f.formatPrice(getPrice($));
 			const description = f.formatDescription(getDescription($));
-			const imagesfileNames = f.downloadImages([getImages($).at(0)], article, ORIGIN_URL);
-			const relatedAccessoriesArticles = getRelatedAccessoriesArticles($, getRelatedAccessories($));
+			const imagesfileNames = m.downloadImages([getImages($).at(0)], sku, ORIGIN_URL);
+			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($, getRelatedAccessories($));
 
-			if (!article) {
+			if (!sku) {
 				console.log(`АКСЕССУАР БЕЗ АРТИКУЛА! (url: ${fullURL})\n`);
 				continue;
 			}
@@ -104,15 +105,15 @@ async function* getRelatedData(source) {
 
 			yield {
 				url: fullURL,
-				article,
+				sku: sku,
 				price,
 				name,
 				description,
 				images: imagesfileNames.join(),
-				related: relatedAccessoriesArticles.join(),
+				related: relatedAccessoriesSKUs.join(),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getData.name} (url: ${fullURL}): ${e}`);
+			console.log(`Ошибка ${getRelatedData.name} (url: ${fullURL}): ${e}`);
 		}
 	}
 }
@@ -122,14 +123,8 @@ async function* getCardURL(url) {
 		try {
 			const pageContent = await p.getPageContent(pageURL);
 			const $ = cheerio.load(pageContent);
-			const cards = $('div.catalog_greed')
-				.find('div.item span.btns a');
-			const cardsURLs = cards
-				.map((i, elem) => $(elem).attr('href'))
-				.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
-				.toArray();
 
-			for (const url of cardsURLs) {
+			for (const url of getCardsURLs($)) {
 				yield url;
 			}
 		} catch (e) {
@@ -145,14 +140,9 @@ async function* getPageURL(url) {
 		try {
 			const pageContent = await p.getPageContent(fullURL);
 			const $ = cheerio.load(pageContent);
-			const maxPageNumber = $('div.modern-page-navigation')
-				?.children('a')
-				?.not('.modern-page-next')
-				?.last()
-				?.text() || 1;
 
-			for (let n = 1; n <= maxPageNumber; n++) {
-				yield `${fullURL}?PAGEN_1=${n}`;
+			for (let n = 1; n <= getMaxPageNumber($); n++) {
+				yield getLinkToPageN(fullURL, n);
 			}
 		} catch (e) {
 			console.log(`Ошибка ${getPageURL.name}: ${e}`);
@@ -164,10 +154,7 @@ async function* getCategoryURL(url, parentCategoryName) {
 	try {
 		const pageContent = await p.getPageContent(url);
 		const $ = cheerio.load(pageContent);
-		const categories = $('div.section_list')
-			.first()
-			.find('div.descr a.name')
-			.toArray();
+		const categories = getCategories($);
 
 		if (!categories.length) {
 			getCategoryURL.hasNext = false;
@@ -177,11 +164,7 @@ async function* getCategoryURL(url, parentCategoryName) {
 		for (const category of categories) {
 			const categoryURL = $(category).attr('href');
 			const fullURL = ORIGIN_URL + categoryURL;
-			const categoryOwnName = f.capitalizeString(
-				$(category)
-					.text()
-					.replace(/[^а-я\s]/gi, '')
-					.trim());
+			const categoryOwnName = f.capitalizeString(getCategoryOwnName($, category));
 			const categoryFullName = parentCategoryName ? parentCategoryName + '>' + categoryOwnName : categoryOwnName;
 
 			yield* getCategoryURL(fullURL, categoryFullName);
@@ -209,14 +192,14 @@ function getName($) {
 		|| '';
 }
 
-function getArticle($, fullURL, name) {
-	return CATALOGUE.articles.get(fullURL)
+function getSKU($, fullURL, name) {
+	return CATALOGUE.SKUs.get(fullURL)
 		|| $('div.top_block div.articul')
 			?.first()
 			?.text()
 			?.replace(/Артикул:\s*/i, '')
 			?.trim()
-		|| f.noArticle(name, CACHE.CURRENT.item + 2, fullURL);
+		|| f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
 }
 
 function getPrice($) {
@@ -266,7 +249,7 @@ function getRelatedAccessories($) {
 		?.find('div.item span.descr');
 }
 
-function getRelatedAccessoriesArticles($, relatedAccessories) {
+function getRelatedAccessoriesSKUs($, relatedAccessories) {
 	return relatedAccessories
 		?.find('span.text>span')
 		?.map((i, elem) => $(elem)
@@ -290,4 +273,40 @@ function getRelatedAccessoriesURLs($, relatedAccessories) {
 		?.map((i, elem) => $(elem).attr('href'))
 		?.toArray()
 		|| [];
+}
+
+function getCardsURLs($) {
+	const cards = $('div.catalog_greed')
+		.find('div.item span.btns a');
+
+	return cards
+		.map((i, elem) => $(elem).attr('href'))
+		.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
+		.toArray();
+}
+
+function getMaxPageNumber($) {
+	return $('div.modern-page-navigation')
+		?.children('a')
+		?.not('.modern-page-next')
+		?.last()
+		?.text() || 1;
+}
+
+function getLinkToPageN(originURL, n) {
+	return `${originURL}?PAGEN_1=${n}`;
+}
+
+function getCategories($) {
+	return $('div.section_list')
+		.first()
+		.find('div.descr a.name')
+		.toArray();
+}
+
+function getCategoryOwnName($, category) {
+	return $(category)
+		.text()
+		.replace(/[^а-я\s]/gi, '')
+		.trim();
 }
