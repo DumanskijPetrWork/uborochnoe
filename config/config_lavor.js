@@ -7,7 +7,7 @@ export const config = {
 			url: "https://lavorpro.ru/catalog/",
 			exceptions: new Set([
 			]),
-			articles: new Map([
+			SKUs: new Map([
 				[],
 			]),
 		},
