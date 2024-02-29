@@ -14,6 +14,5 @@ export const LAUNCH_PUPPETEER_OPTS = {
 export const PAGE_PUPPETEER_OPTS = {
 	networkIdle2Timeout: 5_000,
 	waitUntil: 'domcontentloaded',
-	// waitUntil: 'networkidle2',
 	timeout: 3_000_000
 };
