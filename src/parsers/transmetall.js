@@ -18,43 +18,41 @@ export default {
 
 async function* getData(url, source) {
 	for await (const cardURL of source(url)) {
-		const fullURL = ORIGIN_URL + cardURL;
-
-		console.log(`[${CACHE.CURRENT.item + 1}] ${fullURL}`);
+		console.log(`[${CACHE.CURRENT.item + 1}] ${cardURL}`);
 
 		try {
-			const pageContent = await p.getPageContent(fullURL);
+			const pageContent = await p.getPageContent(cardURL);
 			const $ = cheerio.load(pageContent);
 
 			const name = getName($);
-			const sku = getSKU($, fullURL, name);
+			const sku = getSKU($, cardURL, name);
 			const price = f.formatPrice(getPrice($));
-			const category = getCategory($);
+			const category = f.formatCategory(CATALOGUE, cardURL, getCategory($));
 			const description = f.formatDescription(getDescription($));
 			const properties = f.formatDescription(getProperties($));
 			const imagesfileNames = m.downloadImages(getImages($), sku);
 
 			if (!(name || sku || price)) {
-				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
+				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})\n`);
 				continue;
 			}
 
 			++CACHE.CURRENT.item;
 
-			await f.delay(300);
+			await f.delay(600);
 
 			yield {
-				url: fullURL,
-				sku: sku,
+				url: cardURL,
+				sku,
 				price,
 				category,
 				name,
 				description,
 				properties,
-				images: imagesfileNames.join(),
+				images: imagesfileNames.join() || noImagesFileNames(sku, cardURL),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getData.name} (url: ${fullURL}): ${e}`);
+			console.log(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
 		}
 	}
 }
@@ -95,12 +93,15 @@ function getName($) {
 }
 
 function getSKU($, fullURL, name) {
-	return CATALOGUE.SKUs.get(fullURL)
-		|| $('div.item-aside div.item-box__article')
-			?.first()
-			?.text()
-			?.trim()
+	const sku = $('div.item-aside div.item-box__article')
+		?.first()
+		?.text()
+		?.trim()
 		|| f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
+
+	return CATALOGUE.SKUs.get(fullURL)
+		|| CATALOGUE.SKUs.get(sku)
+		|| sku;
 }
 
 function getPrice($) {
@@ -111,11 +112,14 @@ function getPrice($) {
 }
 
 function getCategory($) {
-	return $('ul.breadcrumbs span[itemprop="name"]')
+	const category = $('ul.breadcrumbs span[itemprop="name"]')
 		?.eq(-2)
 		?.text()
 		?.trim()
 		|| '';
+
+	return CATALOGUE.categories.get(category) || category;
+
 }
 
 function getDescription($) {
@@ -125,6 +129,17 @@ function getDescription($) {
 		?.trim()
 		|| '';
 }
+
+// function getDescriptionVideo($) {
+// 	const video = $('div.fancybox__track div.has-video')
+// 		?.parent()
+// 		?.find('iframe')
+// 		?.html()
+// 		?.trim()
+// 		|| '';
+
+// 	return video ? video + `<br>` : video;
+// }
 
 function getProperties($) {
 	return $('div.item-content.offset-top table.item-content__params')
@@ -137,10 +152,13 @@ function getProperties($) {
 }
 
 function getImages($) {
-	// $('div.item-image__main div#splide01')
-	// 	?.find('li.splide__slide')
-	// 	?.not('.video-slide')
+	// return $('div.fancybox__track div.fancybox__content')
+	// 	?.find('img')
+	// 	?.map((i, elem) => $(elem).attr('src').replace(/\?.*/, ''))
+	// 	?.toArray()
+	// 	|| [];
 	return $('div.item-image__main div.item-img')
+		?.not('.item-img--video')
 		?.find('img')
 		?.map((i, elem) => $(elem).attr('src').replace(/\?.*/, ''))
 		?.toArray()
@@ -153,7 +171,7 @@ function getCardsURLs($) {
 		.find('div.element-content a');
 
 	return cards
-		.map((i, elem) => $(elem).attr('href'))
+		.map((i, elem) => ORIGIN_URL + $(elem).attr('href'))
 		.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
 		.toArray();
 }
@@ -169,4 +187,10 @@ function getMaxPageNumber($) {
 
 function getLinkToPageN(originURL, n) {
 	return `${originURL}&page=${n}`;
+}
+
+function noImagesFileNames(imageName, url) {
+	console.log(`Товар не загрузил изображения: ${url}`);
+
+	return f.cyrillicToTranslit(`${f.clearImageName(imageName)}__0.jpg`);
 }

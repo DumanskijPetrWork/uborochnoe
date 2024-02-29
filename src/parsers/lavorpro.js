@@ -19,27 +19,27 @@ export default {
 
 async function* getData(url, source) {
 	for await (const cardURL of source(url)) {
-		const fullURL = ORIGIN_URL + cardURL;
+		const category = f.formatCategory(CATALOGUE, cardURL, CACHE.CURRENT.category);
 
-		console.log(`[${CACHE.CURRENT.item + 1}] ${fullURL}`);
+		console.log(`[${CACHE.CURRENT.item + 1}] ${cardURL}`);
 
-		if (CACHE.items.has(fullURL)) {
-			console.log(`Новая категория для товара: ${fullURL}\n`);
+		if (CACHE.items.has(cardURL)) {
+			console.log(`Новая категория для товара: ${cardURL}\n`);
 
 			yield {
-				url: fullURL,
-				category: CACHE.CURRENT.category,
+				url: cardURL,
+				category,
 			}
 
 			continue;
 		}
 
 		try {
-			const pageContent = await p.getPageContent(fullURL);
+			const pageContent = await p.getPageContent(cardURL);
 			const $ = cheerio.load(pageContent);
 
 			const name = getName($);
-			const sku = getSKU($, fullURL, name);
+			const sku = getSKU($, cardURL, name);
 			const price = f.formatPrice(getPrice($));
 			const description = f.formatDescription(getDescription($));
 			const properties = f.formatDescription(getProperties($));
@@ -50,19 +50,19 @@ async function* getData(url, source) {
 			addRelatedItems($, relatedAccessories);
 
 			if (!(name || sku || price)) {
-				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${fullURL})\n`);
+				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})\n`);
 				continue;
 			}
 
-			CACHE.items.set(fullURL, ++CACHE.CURRENT.item);
+			CACHE.items.set(cardURL, ++CACHE.CURRENT.item);
 
 			await f.delay(300);
 
 			yield {
-				url: fullURL,
-				sku: sku,
+				url: cardURL,
+				sku,
 				price,
-				category: CACHE.CURRENT.category,
+				category,
 				name,
 				description,
 				properties,
@@ -70,32 +70,33 @@ async function* getData(url, source) {
 				related: relatedAccessoriesSKUs.join(),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getData.name} (url: ${fullURL}): ${e}`);
+			console.log(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
 		}
 	}
 }
 
 async function* getRelatedData(source) {
 	for (const cardURL of source) {
-		const fullURL = ORIGIN_URL + cardURL;
-
-		console.log(`[RELATED: ${CACHE.CURRENT.item + 1}] ${fullURL}`);
+		console.log(`[RELATED: ${CACHE.CURRENT.item + 1}] ${cardURL}`);
 
 		try {
-			const pageContent = await p.getPageContent(fullURL);
+			const pageContent = await p.getPageContent(cardURL);
 			const $ = cheerio.load(pageContent);
 
-			if (getCategory($) !== 'Каталог') continue;
+			if (getCategory($) !== 'Каталог') {
+				console.log(`Аксессуар уже существует: ${cardURL}\n`);
+				continue;
+			}
 
 			const name = getName($);
-			const sku = getSKU($, fullURL, name);
+			const sku = getSKU($, cardURL, name);
 			const price = f.formatPrice(getPrice($));
 			const description = f.formatDescription(getDescription($));
 			const imagesfileNames = m.downloadImages([getImages($).at(0)], sku, ORIGIN_URL);
 			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($, getRelatedAccessories($));
 
 			if (!sku) {
-				console.log(`АКСЕССУАР БЕЗ АРТИКУЛА! (url: ${fullURL})\n`);
+				console.log(`АКСЕССУАР БЕЗ АРТИКУЛА! (url: ${cardURL})\n`);
 				continue;
 			}
 
@@ -104,16 +105,17 @@ async function* getRelatedData(source) {
 			await f.delay(300);
 
 			yield {
-				url: fullURL,
-				sku: sku,
+				url: cardURL,
+				sku,
 				price,
+				category: 'Запчасти',
 				name,
 				description,
 				images: imagesfileNames.join(),
 				related: relatedAccessoriesSKUs.join(),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getRelatedData.name} (url: ${fullURL}): ${e}`);
+			console.log(`Ошибка ${getRelatedData.name} (url: ${cardURL}): ${e}`);
 		}
 	}
 }
@@ -135,14 +137,12 @@ async function* getCardURL(url) {
 
 async function* getPageURL(url) {
 	for await (const categoryURL of getCategoryURL(url)) {
-		const fullURL = ORIGIN_URL + categoryURL;
-
 		try {
-			const pageContent = await p.getPageContent(fullURL);
+			const pageContent = await p.getPageContent(categoryURL);
 			const $ = cheerio.load(pageContent);
 
 			for (let n = 1; n <= getMaxPageNumber($); n++) {
-				yield getLinkToPageN(fullURL, n);
+				yield getLinkToPageN(categoryURL, n);
 			}
 		} catch (e) {
 			console.log(`Ошибка ${getPageURL.name}: ${e}`);
@@ -157,27 +157,25 @@ async function* getCategoryURL(url, parentCategoryName) {
 		const categories = getCategories($);
 
 		if (!categories.length) {
-			getCategoryURL.hasNext = false;
+			getCategoryURL.hasSubCategories = false;
 			return;
 		}
 
 		for (const category of categories) {
-			const categoryURL = $(category).attr('href');
-			const fullURL = ORIGIN_URL + categoryURL;
-			const categoryOwnName = f.capitalizeString(getCategoryOwnName($, category));
-			const categoryFullName = parentCategoryName ? parentCategoryName + '>' + categoryOwnName : categoryOwnName;
+			const categoryURL = getURLOfCategory($, category);
+			const categoryFullName = getFullNameOfCategory($, category, parentCategoryName);
 
-			yield* getCategoryURL(fullURL, categoryFullName);
+			yield* getCategoryURL(categoryURL, categoryFullName);
 
-			if (getCategoryURL.hasNext) {
+			if (getCategoryURL.hasSubCategories) {
 				continue;
 			} else {
-				getCategoryURL.hasNext = true;
+				getCategoryURL.hasSubCategories = true;
 			}
 
 			CACHE.CURRENT.category = categoryFullName;
 
-			if (!CATALOGUE.exceptions.has(fullURL)) {
+			if (!CATALOGUE.exceptions.has(categoryURL)) {
 				yield categoryURL;
 			}
 		}
@@ -193,13 +191,16 @@ function getName($) {
 }
 
 function getSKU($, fullURL, name) {
-	return CATALOGUE.SKUs.get(fullURL)
-		|| $('div.top_block div.articul')
-			?.first()
-			?.text()
-			?.replace(/Артикул:\s*/i, '')
-			?.trim()
+	const sku = $('div.top_block div.articul')
+		?.first()
+		?.text()
+		?.replace(/Артикул:\s*/i, '')
+		?.trim()
 		|| f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
+
+	return CATALOGUE.SKUs.get(fullURL)
+		|| CATALOGUE.SKUs.get(sku)
+		|| sku;
 }
 
 function getPrice($) {
@@ -213,11 +214,13 @@ function getPrice($) {
 }
 
 function getCategory($) {
-	return $('div.breadcrumb a')
+	const category = $('div.breadcrumb a')
 		?.eq(-1)
 		?.text()
 		?.trim()
 		|| '';
+
+	return CATALOGUE.categories.get(category) || category;
 }
 
 function getDescription($) {
@@ -237,6 +240,8 @@ function getProperties($) {
 function getImages($) {
 	return $('div.top_block div.slick-track')
 		?.first()
+		?.find('div.item.slick-slide')
+		?.not('.slick-cloned')
 		?.find('a')
 		?.map((i, elem) => $(elem).attr('href'))
 		?.toArray()
@@ -259,12 +264,8 @@ function getRelatedAccessoriesSKUs($, relatedAccessories) {
 			?.trim()
 			|| '')
 		?.toArray()
+		?.map(sku => CATALOGUE.SKUs.get(sku) || sku)
 		|| [];
-}
-
-function addRelatedItems($, relatedAccessories) {
-	getRelatedAccessoriesURLs($, relatedAccessories)
-		.forEach(url => CACHE.relatedItems.add(url));
 }
 
 function getRelatedAccessoriesURLs($, relatedAccessories) {
@@ -275,12 +276,17 @@ function getRelatedAccessoriesURLs($, relatedAccessories) {
 		|| [];
 }
 
+function addRelatedItems($, relatedAccessories) {
+	getRelatedAccessoriesURLs($, relatedAccessories)
+		.forEach(url => CACHE.relatedItems.add(ORIGIN_URL + url));
+}
+
 function getCardsURLs($) {
 	const cards = $('div.catalog_greed')
 		.find('div.item span.btns a');
 
 	return cards
-		.map((i, elem) => $(elem).attr('href'))
+		.map((i, elem) => ORIGIN_URL + $(elem).attr('href'))
 		.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
 		.toArray();
 }
@@ -304,9 +310,20 @@ function getCategories($) {
 		.toArray();
 }
 
-function getCategoryOwnName($, category) {
-	return $(category)
-		.text()
-		.replace(/[^а-я\s]/gi, '')
-		.trim();
+function getURLOfCategory($, category) {
+	return ORIGIN_URL + $(category)
+		.attr('href');
+}
+
+function getFullNameOfCategory($, category, parentCategoryName) {
+	const categoryOwnNameRaw = f.capitalizeString(
+		$(category)
+			.text()
+			.replace(/[^а-яa-z\s]/gi, '')
+			.trim()
+	);
+	const categoryOwnName = CATALOGUE.categories.get(categoryOwnNameRaw) || categoryOwnNameRaw;
+	const categoryFullNameRaw = parentCategoryName ? parentCategoryName + '>' + categoryOwnName : categoryOwnName;
+
+	return CATALOGUE.categories.get(categoryFullNameRaw) || categoryFullNameRaw;
 }
