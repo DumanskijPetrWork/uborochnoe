@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "main": "node app.js",
-    "variations": "node src/common/variations.js"
+    "variations": "node src/common/variations.js",
+    "test": "node test.js"
   },
   "author": "PDA",
   "license": "ISC",
