@@ -59,8 +59,18 @@ export function noSKU(rawSKU, lineNumber, url) {
 	return sku;
 }
 
-export function formatCategory(CATALOGUE, url, defaultCategory) {
-	return CATALOGUE.categories.get(url) || defaultCategory;
+export function formatCategory(CATALOGUE, url, defaultCategory, replaceAllCategories = false) {
+	const catalogueCategory = CATALOGUE.categories.get(url);
+
+	if (replaceAllCategories) return catalogueCategory || defaultCategory;
+
+	if (catalogueCategory) {
+		CATALOGUE.categories.delete(url);
+
+		return `${catalogueCategory}|${defaultCategory}`;
+	}
+
+	return defaultCategory;
 }
 
 export function formatPrice(priceString, round = true) {
