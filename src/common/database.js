@@ -130,6 +130,7 @@ function getColumns() {
 		{ header: 'images', key: 'images' },
 		{ header: 'description', key: 'description', width: 10 },
 		{ header: 'properties', key: 'properties', width: 10 },
+		{ header: 'docs', key: 'docs', width: 10 },
 		{ header: 'related', key: 'related' },
 	];
 }
