@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import UserAgent from "user-agents";
+import { getNewUserAgentString } from "./functions.js"
 import { LAUNCH_PUPPETEER_OPTS, PAGE_PUPPETEER_OPTS } from "../../config/puppeteer_options.js";
 
 
@@ -35,7 +35,7 @@ class PuppeteerHandler {
 
 		try {
 			const page = await this.browser.newPage();
-			await page.setUserAgent(new UserAgent().toString());
+			await page.setUserAgent(getNewUserAgentString());
 
 			await page.setRequestInterception(true);
 			page.on('request',
