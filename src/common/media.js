@@ -10,6 +10,8 @@ export function downloadImages(images, imageName, originURL = '') {
 	let i = 0;
 
 	for (const imageURL of images) {
+		if (!imageURL) continue;
+
 		const fileName = f.cyrillicToTranslit(
 			`${f.clearImageName(imageName)}__${i++}` + path.extname(imageURL)
 		);
