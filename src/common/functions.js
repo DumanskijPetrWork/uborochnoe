@@ -1,8 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { URL } from 'url';
+import UserAgent from "user-agents";
 import CyrillicToTranslit from 'cyrillic-to-translit-js';
 
+
+export function getNewUserAgentString() {
+	return new UserAgent().toString();
+}
 
 export function delay(ms) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -37,7 +42,8 @@ export function changeFileName(filePath, suffix, extName) {
 export function getCatalogueParams(parserName, config) {
 	const catalogueName = path.parse(parserName).name;
 	const CATALOGUE = config.CATALOGUES.find(catalogue => catalogue.name === catalogueName);
-	const ORIGIN_URL = new URL(CATALOGUE.url).origin;
+	const catalogueURL = CATALOGUE.url instanceof Array ? CATALOGUE.url[0] : CATALOGUE.url;
+	const ORIGIN_URL = new URL(catalogueURL).origin;
 
 	return { CATALOGUE, ORIGIN_URL };
 }
@@ -53,27 +59,41 @@ export function noSKU(rawSKU, lineNumber, url) {
 	return sku;
 }
 
-export function formatPrice(priceString) {
-	const price = parseInt(priceString.replace(/\s/g, ''));
+export function formatCategory(CATALOGUE, url, defaultCategory) {
+	return CATALOGUE.categories.get(url) || defaultCategory;
+}
+
+export function formatPrice(priceString, round = true) {
+	let price = parseInt(priceString.replace(/\s/g, ''));
 
 	if (!price) {
 		return 0;
 	}
 
-	let n = (price > 1000) ? 100 : 10;
+	if (round) {
+		const n = (price > 1000) ? 100 : 10;
+		price = Math.ceil(price / n) * n;
+	}
 
-	return Math.ceil(price / n) * n;
+	return price;
 }
 
 export function capitalizeString(str) {
 	return str.at(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-export function formatDescription(rawDescription) {
-	const regexp = /^\s*<br>\s*|<(h[1-6]).*>\s*Описание\s*<\/\1>\s*/gi;
-	const description = rawDescription.replace(regexp, '').replace(/\t/g, '').trim();
+export function formatDescription(rawDescription, descriptionVideo) {
+	const regexp = /^\s*<br>\s*|<(h[1-6]).*?>\s*Описание\s*<\/\1>\s*/gi;
+	const description = rawDescription
+		.replace(regexp, '')
+		.replace(/<a.*?<\/a>/gs, '')
+		.replace(/\t/g, '')
+		.trim();
 
-	return description;
+	return description || descriptionVideo
+		? ['<h2>Описание</h2>', descriptionVideo, description]
+			.join('<br>')
+		: '';
 }
 
 export function cyrillicToTranslit(str) {
