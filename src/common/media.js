@@ -1,8 +1,10 @@
 import axios from 'axios';
+import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import { globSync } from 'glob';
 import * as f from './functions.js';
+import { IMG_FORMAT_OPTS, IMG_RESIZE_OPTS } from '../../config/sharp_options.js';
 
 
 export function downloadImages(images, imageName, originURL = '') {
@@ -13,7 +15,7 @@ export function downloadImages(images, imageName, originURL = '') {
 		if (!imageURL) continue;
 
 		const fileName = f.cyrillicToTranslit(
-			`${f.clearImageName(imageName)}__${i++}` + path.extname(imageURL)
+			`${f.clearImageName(imageName)}__${i++}.${IMG_FORMAT_OPTS.extname}`
 		);
 
 		imagesfileNames.push(fileName);
@@ -25,18 +27,26 @@ export function downloadImages(images, imageName, originURL = '') {
 
 async function downloadMedia(url, fileName) {
 	const dirName = CACHE.CURRENT.MEDIA_DIR_NAME;
-	const searchFilePath = path.resolve(dirName, '..', '*', fileName);
+	const searchFilePath = path.resolve(dirName, '..', '*', fileName.replace(/\w+$/, '*'));
 	const newFilePath = path.resolve(dirName, fileName);
 
 	try {
 		if (globSync(searchFilePath).length) return;
 
-		const response = await axios({
+		axios({
 			url,
 			responseType: 'stream',
-		});
-
-		response.data.pipe(fs.createWriteStream(newFilePath));
+		})
+			.then(response => response.data
+				.pipe(sharp())
+			)
+			.then(img => img
+				.resize(IMG_RESIZE_OPTS)
+				.webp(IMG_FORMAT_OPTS.quality)
+			)
+			.then(formattedImg => formattedImg
+				.pipe(fs.createWriteStream(newFilePath))
+			);
 	} catch (e) {
 		console.log(`Ошибка ${downloadMedia.name} (path: ${path.join(dirName, fileName)}, url: ${url}): ${e}`);
 	}
