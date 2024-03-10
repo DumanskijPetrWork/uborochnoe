@@ -21,18 +21,21 @@ global.CACHE = {
 	}
 };
 
-await main();
+class App {
+	async main() {
+		const startTimestamp = Date.now();
 
-async function main() {
-	const startTimestamp = Date.now();
-
-	try {
-		await createDataBase();
-	} catch (e) {
-		console.log(`Ошибка ${main.name}: ${e}`);
-	} finally {
-		await p.closeBrowser();
-		const execTime = new Date(Date.now() - startTimestamp);
-		console.log(`Время выполнения: ${(execTime.getMinutes())} мин. ${(execTime.getSeconds())} с.`);
+		try {
+			await createDataBase();
+		} catch (e) {
+			console.log(`Ошибка ${this.main.name}: ${e}`);
+		} finally {
+			await p.closeBrowser();
+			const execTime = new Date(Date.now() - startTimestamp);
+			console.log(`Время выполнения: ${(execTime.getMinutes())} мин. ${(execTime.getSeconds())} с.`);
+		}
 	}
 }
+
+const app = new App();
+await app.main();
