@@ -48,12 +48,22 @@ export function getCatalogueParams(parserName, config) {
 	return { CATALOGUE, ORIGIN_URL };
 }
 
+export function appendSearchParamsToURL(rawURL, searchParams) {
+	const url = new URL(rawURL);
+
+	for (const [param, value] of Object.entries(searchParams)) {
+		url.searchParams.set(param, value);
+	}
+
+	return url.href;
+}
+
 export function noSKU(rawSKU, lineNumber, url) {
 	const regexp = /\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)|\b[A-Z\d]+\b/g;
 	const regexpExclude = /\b[A-Z]+\b|\b[\d]+(W|L|P|A|V)?\b|\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)/;
 	const sku = rawSKU.match(regexp)?.filter(str => !regexpExclude.test(str))[0] || rawSKU;
 
-	console.log(`Товар без артикула (строка: ${lineNumber}, вычислено: ${sku}, источник: ${rawSKU}):\n${url}\n`);
+	console.log(`Товар без артикула (строка: ${lineNumber}, вычислено: ${sku}, источник: ${rawSKU})\n`);
 	CACHE.itemsNoSKU.set(url, 'Нет артикула');
 
 	return sku;
@@ -100,10 +110,7 @@ export function formatDescription(rawDescription, descriptionVideo) {
 		.replace(/\t/g, '')
 		.trim();
 
-	return description || descriptionVideo
-		? ['<h2>Описание</h2>', descriptionVideo, description]
-			.join('<br>')
-		: '';
+	return description || descriptionVideo ? [descriptionVideo, description].join('<br>') : '';
 }
 
 export function cyrillicToTranslit(str) {
@@ -122,6 +129,31 @@ export function setCellsValues(worksheet, rowIndex, valuesByColumnsNames) {
 	for (const [columnName, value] of Object.entries(valuesByColumnsNames)) {
 		row.getCell(columnName).value = value;
 	}
+}
+
+export function createYouTubeIframe(
+	id,
+	{
+		allow = [
+			'accelerometer',
+			'autoplay',
+			'encrypted-media',
+			'gyroscope',
+			'picture-in-picture'
+		],
+		allowfullscreen = true,
+	} = {}
+) {
+	return `<iframe> allow="${allow.join(';')
+		}" ${allowfullscreen ? 'allowfullscreen' : ''
+		} src="${appendSearchParamsToURL(
+			`https://www.youtube.com/embed/${id}`,
+			{
+				rel: 0,
+				showinfo: 0,
+				autoplay: 1
+			}
+		)}" </iframe>`;
 }
 
 export const currentDateString = getCurrentDateString();
