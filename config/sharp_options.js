@@ -1,6 +1,6 @@
 export const IMG_RESIZE_OPTS = {
-	width: 2560,
-	height: 1910,
+	width: 1200,
+	height: 800,
 	fit: "inside", // contain
 	background: { r: 0, g: 0, b: 0, alpha: 0 },
 };
