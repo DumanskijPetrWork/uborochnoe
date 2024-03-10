@@ -11,6 +11,7 @@
     "rules": {},
     "globals": {
         "global": "readonly",
-        "CACHE": "readonly"
+        "CACHE": "readonly",
+        "logger": "writable"
     }
 }
