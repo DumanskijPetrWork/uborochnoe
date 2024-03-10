@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import path from 'path';
 
 import * as f from './functions.js';
+import { Logger } from './logger.js';
 import PARSERS from '../../config/parsers.js';
 
 
@@ -18,6 +19,7 @@ export async function createDataBase() {
 
 		CACHE.clear(isRelated ? false : true);
 		f.updateDirs(parser.config.SITE_URL, dirName);
+		global.logger = new Logger(path.join(CACHE.CURRENT.DATA_DIR_NAME, 'logs.log'));
 		console.log(`\n[${isRelated ? 'RELATED: ' : ''}${parser.name}]`);
 		await createXLSX(dataGenerator, dirName);
 	}
@@ -69,7 +71,7 @@ async function fillContent(dataGenerator, sheet) {
 				}
 
 				if (CACHE.SKUs.has(sku)) {
-					console.log(`Повторяющийся артикул в строке ${CACHE.CURRENT.item + 1}: ${sku}, url: ${item.url}\n`);
+					console.log(`Повторяющийся артикул в строке ${CACHE.CURRENT.item + 1}: ${sku}\n`);
 					CACHE.itemsNoSKU.set(item.url, 'Повторяющийся артикул');
 				} else if (sku !== '') {
 					CACHE.SKUs.add(sku);
