@@ -33,7 +33,7 @@ async function* getData(url, source) {
 			const imagesfileNames = m.downloadImages(getImages($), sku);
 
 			if (!(name || sku || price)) {
-				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})\n`);
+				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
 				continue;
 			}
 
@@ -186,11 +186,16 @@ function getMaxPageNumber($) {
 }
 
 function getLinkToPageN(originURL, n) {
-	return `${originURL}&page=${n}`;
+	return f.appendSearchParamsToURL(
+		originURL,
+		{
+			page: n,
+		}
+	);
 }
 
 function noImagesFileNames(imageName, url) {
-	console.log(`Товар не загрузил изображения: ${url}`);
+	logger.log(`Товар не загрузил изображения: ${url}`);
 
 	return f.cyrillicToTranslit(`${f.clearImageName(imageName)}__0.jpg`);
 }

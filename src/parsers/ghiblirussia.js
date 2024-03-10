@@ -34,7 +34,7 @@ async function* getData(url, source) {
 			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($);
 
 			if (!(name || sku || price)) {
-				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})\n`);
+				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
 				continue;
 			}
 
@@ -181,7 +181,7 @@ function getRelatedAccessories($) {
 }
 
 function getRelatedAccessoriesSKUs($) {
-	return $('div#cart-param-2 div.txt')
+	const SKUs = $('div#cart-param-2 div.txt')
 		?.find('li.icom_datalist_value strong')
 		?.map((i, elem) => $(elem)
 			?.text()
@@ -190,6 +190,8 @@ function getRelatedAccessoriesSKUs($) {
 		?.toArray()
 		?.map(sku => CATALOGUE.SKUs.get(sku) || sku)
 		|| [];
+
+	return [...new Set(SKUs)];
 }
 
 function getCardsURLs($) {

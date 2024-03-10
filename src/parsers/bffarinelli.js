@@ -23,7 +23,7 @@ async function* getData(url, source) {
 		console.log(`[${CACHE.CURRENT.item + 1}] ${cardURL}`);
 
 		if (CACHE.items.has(cardURL)) {
-			console.log(`Новая категория для товара: ${cardURL}\n`);
+			console.log(`Новая категория для товара: ${category}\n`);
 
 			yield {
 				url: cardURL,
@@ -47,7 +47,7 @@ async function* getData(url, source) {
 			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($, relatedAccessories);
 
 			if (!(name || sku || price)) {
-				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})\n`);
+				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
 				continue;
 			}
 
@@ -196,7 +196,7 @@ function getRelatedAccessories($) {
 }
 
 function getRelatedAccessoriesSKUs($, relatedAccessories) {
-	return relatedAccessories
+	const SKUs = relatedAccessories
 		?.find('span')
 		?.map((i, elem) => $(elem)
 			?.text()
@@ -206,6 +206,9 @@ function getRelatedAccessoriesSKUs($, relatedAccessories) {
 		?.toArray()
 		?.map(sku => CATALOGUE.SKUs.get(sku) || sku)
 		|| [];
+
+	return [...new Set(SKUs)];
+
 }
 
 function getCardsURLs($) {
@@ -225,7 +228,12 @@ function getMaxPageNumber($) {
 }
 
 function getLinkToPageN(originURL, n) {
-	return `${originURL}?PAGEN_1=${n}`;
+	return f.appendSearchParamsToURL(
+		originURL,
+		{
+			PAGEN_1: n,
+		}
+	);
 }
 
 function getCategories($) {

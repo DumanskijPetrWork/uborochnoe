@@ -24,8 +24,13 @@ async function* getData(catalogueURL, source) {
 
 		console.log(`[${CACHE.CURRENT.item + 1}] ${url}`);
 
+		if (/NILFISK/i.test(name)) {
+			console.log(`Товар NILFISK\n`);
+			continue;
+		}
+
 		if (CACHE.items.has(url)) {
-			console.log(`Новая категория для товара: ${url}\n`);
+			console.log(`Новая категория для товара: ${category}\n`);
 
 			yield {
 				url,
@@ -36,7 +41,7 @@ async function* getData(catalogueURL, source) {
 		}
 
 		if (!(name || sku || price)) {
-			console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${url})\n`);
+			logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
 			continue;
 		}
 

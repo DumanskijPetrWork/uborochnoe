@@ -24,7 +24,7 @@ async function* getData(url, source) {
 		console.log(`[${CACHE.CURRENT.item + 1}] ${cardURL}`);
 
 		if (CACHE.items.has(cardURL)) {
-			console.log(`Новая категория для товара: ${cardURL}\n`);
+			console.log(`Новая категория для товара: ${category}\n`);
 
 			yield {
 				url: cardURL,
@@ -50,7 +50,7 @@ async function* getData(url, source) {
 			addRelatedItems($, relatedAccessories);
 
 			if (!(name || sku || price)) {
-				console.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})\n`);
+				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
 				continue;
 			}
 
@@ -84,7 +84,7 @@ async function* getRelatedData(source) {
 			const $ = cheerio.load(pageContent);
 
 			if (getCategory($) !== 'Каталог') {
-				console.log(`Аксессуар уже существует: ${cardURL}\n`);
+				console.log(`Аксессуар уже существует\n`);
 				continue;
 			}
 
@@ -96,7 +96,7 @@ async function* getRelatedData(source) {
 			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($, getRelatedAccessories($));
 
 			if (!sku) {
-				console.log(`АКСЕССУАР БЕЗ АРТИКУЛА! (url: ${cardURL})\n`);
+				logger.log(`АКСЕССУАР БЕЗ АРТИКУЛА! (url: ${cardURL})\n`);
 				continue;
 			}
 
@@ -192,10 +192,13 @@ function getName($) {
 
 function getSKU($, fullURL, name) {
 	const sku = $('div.top_block div.articul')
-		?.first()
-		?.text()
-		?.replace(/Артикул:\s*/i, '')
-		?.trim()
+		?.map((i, elem) => $(elem)
+			?.text()
+			?.replace(/.*:/, '')
+			?.trim()
+		)
+		?.toArray()
+		?.find(item => item)
 		|| f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
 
 	return CATALOGUE.SKUs.get(fullURL)
@@ -250,22 +253,23 @@ function getImages($) {
 
 function getRelatedAccessories($) {
 	return $('div.catalog_greed.notindex')
-		?.eq(-1)
 		?.find('div.item span.descr');
 }
 
 function getRelatedAccessoriesSKUs($, relatedAccessories) {
-	return relatedAccessories
+	const SKUs = relatedAccessories
 		?.find('span.text>span')
 		?.map((i, elem) => $(elem)
 			?.eq(-1)
 			?.text()
-			?.replace(/Артикул:\s*/i, '')
+			?.replace(/.*:/, '')
 			?.trim()
 			|| '')
 		?.toArray()
 		?.map(sku => CATALOGUE.SKUs.get(sku) || sku)
 		|| [];
+
+	return [...new Set(SKUs)];
 }
 
 function getRelatedAccessoriesURLs($, relatedAccessories) {
@@ -300,7 +304,12 @@ function getMaxPageNumber($) {
 }
 
 function getLinkToPageN(originURL, n) {
-	return `${originURL}?PAGEN_1=${n}`;
+	return f.appendSearchParamsToURL(
+		originURL,
+		{
+			PAGEN_1: n,
+		}
+	);
 }
 
 function getCategories($) {
