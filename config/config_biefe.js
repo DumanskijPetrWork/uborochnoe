@@ -30,7 +30,7 @@ export const config = {
 			]),
 			categories: new Map([
 				['Промышленные парогенераторы', 'Парогенераторы с утюгом'],
-				['Запчасти Bieffe', 'Аксессуары и запчасти>0'],
+				['Запчасти Bieffe', 'Аксессуары и запчасти>Запчасти Bieffe'],
 				['Приспособления и аксессуары для ВТО', 'Аксессуары и запчасти>Приспособления и аксессуары для ВТО'],
 				['Чистящие средства', 'Аксессуары и запчасти>Чистящие средства'],
 				['https://www.transmetall.ru/catalog/katalog_oborudovaniya/oborudovaniye_dlya_vto/oborudovaniye_dlya_khimchistki_odezhdy_i_obuvi/detail/cushilnyj_stol_dlya_bieffe_scarpa_vapor_bf4250000s_obuvnoj_23606', 'Парогенераторы для обуви'],
