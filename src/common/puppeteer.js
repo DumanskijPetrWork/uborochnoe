@@ -15,7 +15,7 @@ class PuppeteerHandler {
 			this.browser = await puppeteer.launch(LAUNCH_PUPPETEER_OPTS);
 			console.log('* Puppeteer запущен *');
 		} catch (e) {
-			console.log(`Ошибка ${this.initBrowser.name}: ${e}`);
+			console.error(`Ошибка ${this.initBrowser.name}: ${e}`);
 		}
 	}
 
@@ -47,7 +47,7 @@ class PuppeteerHandler {
 
 			return content;
 		} catch (e) {
-			console.log(`Ошибка ${this.getPageContent.name}: ${e}`);
+			console.error(`Ошибка ${this.getPageContent.name}: ${e}`);
 		}
 	}
 }

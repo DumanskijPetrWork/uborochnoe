@@ -33,7 +33,7 @@ async function* getData(url, source) {
 			const imagesfileNames = m.downloadImages(getImages($), sku);
 
 			if (!(name || sku || price)) {
-				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
+				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})`);
 				continue;
 			}
 
@@ -52,7 +52,7 @@ async function* getData(url, source) {
 				images: imagesfileNames.join() || noImagesFileNames(sku, cardURL),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
+			console.error(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
 		}
 	}
 }
@@ -67,7 +67,7 @@ async function* getCardURL(url) {
 				yield url;
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getCardURL.name}: ${e}`);
+			console.error(`Ошибка ${getCardURL.name}: ${e}`);
 		}
 	}
 }
@@ -81,7 +81,7 @@ async function* getPageURL(url) {
 			yield getLinkToPageN(url, n);
 		}
 	} catch (e) {
-		console.log(`Ошибка ${getPageURL.name}: ${e}`);
+		console.error(`Ошибка ${getPageURL.name}: ${e}`);
 	}
 }
 
@@ -93,6 +93,7 @@ function getName($) {
 }
 
 function getSKU($, fullURL, name) {
+	const nameTranslit = f.cyrillicToTranslit(name);
 	const sku = $('div.item-aside div.item-box__article')
 		?.first()
 		?.text()
@@ -101,7 +102,7 @@ function getSKU($, fullURL, name) {
 
 	return CATALOGUE.SKUs.get(fullURL)
 		|| CATALOGUE.SKUs.get(sku)
-		|| sku;
+		|| f.isUniqueSKU(sku, fullURL) ? sku : `${sku} - ${nameTranslit}`;
 }
 
 function getPrice($) {

@@ -34,7 +34,7 @@ async function* getData(url, source) {
 			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($);
 
 			if (!(name || sku || price)) {
-				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
+				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})`);
 				continue;
 			}
 
@@ -54,7 +54,7 @@ async function* getData(url, source) {
 				related: relatedAccessoriesSKUs.join(),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
+			console.error(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
 		}
 	}
 }
@@ -69,7 +69,7 @@ async function* getCardURL(url) {
 				yield url;
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getCardURL.name}: ${e}`);
+			console.error(`Ошибка ${getCardURL.name}: ${e}`);
 		}
 	}
 }
@@ -92,7 +92,7 @@ async function* getCategoryURL(URLs) {
 			}
 		}
 	} catch (e) {
-		console.log(`Ошибка ${getCategoryURL.name}: ${e}`);
+		console.error(`Ошибка ${getCategoryURL.name}: ${e}`);
 	}
 }
 
@@ -104,6 +104,7 @@ function getName($) {
 }
 
 function getSKU($, fullURL, name) {
+	const nameTranslit = f.cyrillicToTranslit(name);
 	const sku = $('div.content_main div.art_full span.art_value_full')
 		?.first()
 		?.text()
@@ -111,7 +112,7 @@ function getSKU($, fullURL, name) {
 
 	return CATALOGUE.SKUs.get(fullURL)
 		|| CATALOGUE.SKUs.get(sku)
-		|| sku;
+		|| f.isUniqueSKU(sku, fullURL) ? sku : `${sku} - ${nameTranslit}`;
 }
 
 function getPrice($) {

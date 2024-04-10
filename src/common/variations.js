@@ -27,7 +27,7 @@ async function createVariations() {
 			}
 		}
 	} catch (e) {
-		console.log(`Ошибка ${createVariations.name}: ${e}`);
+		console.error(`Ошибка ${createVariations.name}: ${e}`);
 	}
 }
 
@@ -67,7 +67,7 @@ async function addVariations(filePath) {
 
 		await workbook.xlsx.writeFile(f.changeFileName(filePath, 'with_variations', 'xlsx'));
 	} catch (e) {
-		console.log(`Ошибка ${addVariations.name}: ${e}`);
+		console.error(`Ошибка ${addVariations.name}: ${e}`);
 	}
 }
 
@@ -106,6 +106,6 @@ async function variationsToJSON(filePath) {
 
 		fs.writeFileSync(f.changeFileName(filePath, 'variations', 'json'), json);
 	} catch (e) {
-		console.log(`Ошибка ${variationsToJSON.name}: ${e}`);
+		console.error(`Ошибка ${variationsToJSON.name}: ${e}`);
 	}
 }

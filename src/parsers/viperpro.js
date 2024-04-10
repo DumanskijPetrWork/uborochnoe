@@ -41,7 +41,7 @@ async function* getData(catalogueURL, source) {
 		}
 
 		if (!(name || sku || price)) {
-			logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
+			logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${url})`);
 			continue;
 		}
 
@@ -73,7 +73,7 @@ async function* getData(catalogueURL, source) {
 				images: imagesfileNames.join(),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getData.name} (url: ${url}): ${e}`);
+			console.error(`Ошибка ${getData.name} (url: ${url}): ${e}`);
 		}
 	}
 }
@@ -92,7 +92,7 @@ async function* requestProduct(url) {
 				yield product;
 			}
 		} catch (e) {
-			console.log(`Ошибка ${requestProduct.name}: ${e}`);
+			console.error(`Ошибка ${requestProduct.name}: ${e}`);
 		}
 	}
 }
@@ -114,7 +114,7 @@ async function* requestCategoryFilters(url) {
 			yield filter;
 		}
 	} catch (e) {
-		console.log(`Ошибка ${requestCategoryFilters.name}: ${e}`);
+		console.error(`Ошибка ${requestCategoryFilters.name}: ${e}`);
 	}
 }
 
@@ -157,11 +157,12 @@ function getCategoryFiltersOptions(url) {
 }
 
 function getSKU(skuRaw, fullURL, name) {
+	const nameTranslit = f.cyrillicToTranslit(name);
 	const sku = skuRaw || f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
 
 	return CATALOGUE.SKUs.get(fullURL)
 		|| CATALOGUE.SKUs.get(sku)
-		|| sku;
+		|| f.isUniqueSKU(sku, fullURL) ? sku : `${sku} - ${nameTranslit}`;
 }
 
 function getDescription(text) {

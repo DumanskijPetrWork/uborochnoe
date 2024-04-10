@@ -50,7 +50,7 @@ async function* getData(url, source) {
 			addRelatedItems($, relatedAccessories);
 
 			if (!(name || sku || price)) {
-				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА!\n`);
+				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})`);
 				continue;
 			}
 
@@ -70,7 +70,7 @@ async function* getData(url, source) {
 				related: relatedAccessoriesSKUs.join(),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
+			console.error(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
 		}
 	}
 }
@@ -96,7 +96,7 @@ async function* getRelatedData(source) {
 			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($, getRelatedAccessories($));
 
 			if (!sku) {
-				logger.log(`АКСЕССУАР БЕЗ АРТИКУЛА! (url: ${cardURL})\n`);
+				logger.log(`АКСЕССУАР БЕЗ АРТИКУЛА! (url: ${cardURL})`);
 				continue;
 			}
 
@@ -115,7 +115,7 @@ async function* getRelatedData(source) {
 				related: relatedAccessoriesSKUs.join(),
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getRelatedData.name} (url: ${cardURL}): ${e}`);
+			console.error(`Ошибка ${getRelatedData.name} (url: ${cardURL}): ${e}`);
 		}
 	}
 }
@@ -130,7 +130,7 @@ async function* getCardURL(url) {
 				yield url;
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getCardURL.name}: ${e}`);
+			console.error(`Ошибка ${getCardURL.name}: ${e}`);
 		}
 	}
 }
@@ -145,7 +145,7 @@ async function* getPageURL(url) {
 				yield getLinkToPageN(categoryURL, n);
 			}
 		} catch (e) {
-			console.log(`Ошибка ${getPageURL.name}: ${e}`);
+			console.error(`Ошибка ${getPageURL.name}: ${e}`);
 		}
 	}
 }
@@ -154,17 +154,19 @@ async function* getCategoryURL(url, parentCategoryName) {
 	try {
 		const pageContent = await p.getPageContent(url);
 		const $ = cheerio.load(pageContent);
-		const categories = getCategories($);
+		const categories = getCategories($)
+			.map(category => ({
+				categoryURL: getURLOfCategory($, category),
+				categoryFullName: getFullNameOfCategory($, category, parentCategoryName),
+			}))
+			.filter(category => category.categoryURL);
 
 		if (!categories.length) {
 			getCategoryURL.hasSubCategories = false;
 			return;
 		}
 
-		for (const category of categories) {
-			const categoryURL = getURLOfCategory($, category);
-			const categoryFullName = getFullNameOfCategory($, category, parentCategoryName);
-
+		for (const { categoryURL, categoryFullName } of categories) {
 			yield* getCategoryURL(categoryURL, categoryFullName);
 
 			if (getCategoryURL.hasSubCategories) {
@@ -180,7 +182,7 @@ async function* getCategoryURL(url, parentCategoryName) {
 			}
 		}
 	} catch (e) {
-		console.log(`Ошибка ${getCategoryURL.name}: ${e}`);
+		console.error(`Ошибка ${getCategoryURL.name}: ${e}`);
 	}
 }
 
@@ -191,6 +193,7 @@ function getName($) {
 }
 
 function getSKU($, fullURL, name) {
+	const nameTranslit = f.cyrillicToTranslit(name);
 	const sku = $('div.top_block div.articul')
 		?.map((i, elem) => $(elem)
 			?.text()
@@ -203,7 +206,7 @@ function getSKU($, fullURL, name) {
 
 	return CATALOGUE.SKUs.get(fullURL)
 		|| CATALOGUE.SKUs.get(sku)
-		|| sku;
+		|| f.isUniqueSKU(sku, fullURL) ? sku : `${sku} - ${nameTranslit}`;
 }
 
 function getPrice($) {
@@ -320,8 +323,15 @@ function getCategories($) {
 }
 
 function getURLOfCategory($, category) {
-	return ORIGIN_URL + $(category)
-		.attr('href');
+	const categoryURL = ORIGIN_URL + $(category).attr('href');
+
+	if (CACHE.categoriesURLs.has(categoryURL)) {
+		return;
+	} else {
+		CACHE.categoriesURLs.add(categoryURL);
+	}
+
+	return categoryURL;
 }
 
 function getFullNameOfCategory($, category, parentCategoryName) {
