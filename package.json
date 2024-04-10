@@ -17,6 +17,7 @@
     "cyrillic-to-translit-js": "3.2.1",
     "exceljs": "4.4.0",
     "fs": "0.0.1-security",
+    "fs-extra": "^11.2.0",
     "glob": "10.3.10",
     "path": "0.12.7",
     "puppeteer": "21.5.2",
