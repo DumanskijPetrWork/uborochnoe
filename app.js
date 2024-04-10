@@ -1,25 +1,7 @@
 import { p } from './src/common/puppeteer.js'
 import { createDataBase } from './src/common/database.js'
+import Cache from './src/common/cache.js';
 
-
-global.CACHE = {
-	clear(all) {
-		this.CURRENT = {
-			DATA_DIR_NAME: '',
-			MEDIA_DIR_NAME: '',
-			category: '',
-			item: 0,
-		};
-
-		this.items = new Map();
-		this.itemsNoSKU = new Map();
-		this.SKUs = new Set();
-
-		if (all) {
-			this.relatedItems = new Set();
-		}
-	}
-};
 
 class App {
 	async main() {
@@ -28,14 +10,17 @@ class App {
 		try {
 			await createDataBase();
 		} catch (e) {
-			console.log(`Ошибка ${this.main.name}: ${e}`);
+			console.error(`Ошибка ${this.main.name}: ${e}`);
 		} finally {
 			await p.closeBrowser();
 			const execTime = new Date(Date.now() - startTimestamp);
-			console.log(`Время выполнения: ${(execTime.getMinutes())} мин. ${(execTime.getSeconds())} с.`);
+			execTime.setMinutes(execTime.getMinutes() + execTime.getTimezoneOffset());
+			console.log(`Время выполнения: ${(execTime.getHours())} ч. ${(execTime.getMinutes())} мин. ${(execTime.getSeconds())} с.`);
 		}
 	}
 }
 
 const app = new App();
+global.CACHE = new Cache();
+
 await app.main();
