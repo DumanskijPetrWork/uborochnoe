@@ -1,5 +1,8 @@
 /node_modules
 /dist
+/test
+/.vscode
+*.zip
 package-lock.json
 test.js
 todo.md
