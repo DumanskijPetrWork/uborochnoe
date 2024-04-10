@@ -14,8 +14,10 @@ export function downloadImages(images, imageName, originURL = '') {
 	for (const imageURL of images) {
 		if (!imageURL) continue;
 
-		const fileName = f.cyrillicToTranslit(
-			`${f.clearImageName(imageName)}__${i++}.${IMG_FORMAT_OPTS.extname}`
+		const fileName = f.clearImageName(
+			f.cyrillicToTranslit(
+				`${imageName}__${i++}.${IMG_FORMAT_OPTS.extname}`
+			)
 		);
 
 		imagesfileNames.push(fileName);
@@ -33,21 +35,30 @@ async function downloadMedia(url, fileName) {
 	try {
 		if (globSync(searchFilePath).length) return;
 
-		axios({
+		const { data, headers } = await axios({
 			url,
 			responseType: 'stream',
-		})
-			.then(response => response.data
-				.pipe(sharp())
-			)
-			.then(img => img
-				.resize(IMG_RESIZE_OPTS)
-				.webp(IMG_FORMAT_OPTS.quality)
-			)
-			.then(formattedImg => formattedImg
-				.pipe(fs.createWriteStream(newFilePath))
-			);
+		});
+		const contentLength = headers['content-length'];
+		const contentType = headers['content-type'];
+
+		if (!+contentLength || !contentType.startsWith('image')) {
+			throw new Error(`Wrong file data (type: ${contentType}, length: ${contentLength})`);
+		}
+
+		const transform = sharp()
+			.resize(IMG_RESIZE_OPTS)
+			.webp(IMG_FORMAT_OPTS.quality)
+			.on('error', e => {
+				logger.log(`Ошибка скачивания файла ${fileName} (url: ${url}): ${e}`);
+				fs.unlinkSync(newFilePath);
+			});
+		const fileStream = fs.createWriteStream(newFilePath);
+
+		await data
+			.pipe(transform)
+			.pipe(fileStream);
 	} catch (e) {
-		console.log(`Ошибка ${downloadMedia.name} (path: ${path.join(dirName, fileName)}, url: ${url}): ${e}`);
+		logger.log(`Ошибка ${downloadMedia.name} (path: ${path.join(dirName, fileName)}, url: ${url}): ${e}`);
 	}
 }
