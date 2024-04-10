@@ -1,8 +1,9 @@
 import ExcelJS from 'exceljs';
 import path from 'path';
+import { globIterate } from 'glob';
 
 import * as f from './functions.js';
-import { Logger } from './logger.js';
+import Logger from './logger.js';
 import PARSERS from '../../config/parsers.js';
 
 
@@ -30,61 +31,64 @@ async function createXLSX(dataGenerator, fileName) {
 		CACHE.CURRENT.DATA_DIR_NAME,
 		`${fileName}_${f.currentDateString}.xlsx`
 	);
+	const updatedOnlyfilePath = filePath.replace('.xlsx', '_updated.xlsx');
 
 	try {
 		const workbook = new ExcelJS.Workbook();
+		const workbookUpdatedOnly = new ExcelJS.Workbook();
 		const sheet = workbook.addWorksheet('Товары');
+		const sheetUpdatedOnly = workbookUpdatedOnly.addWorksheet('Товары');
+		const columnsIds = getColumns();
 
-		sheet.columns = getColumns();
-		await fillContent(dataGenerator, sheet);
+		[sheet, sheetUpdatedOnly].forEach(sheet => sheet.columns = columnsIds);
+		await fillContent({ dataGenerator, sheet, sheetUpdatedOnly, limitItemsNumber: -1 });
 		await workbook.xlsx.writeFile(filePath);
+		await workbookUpdatedOnly.xlsx.writeFile(updatedOnlyfilePath);
 	} catch (e) {
-		console.log(`Ошибка ${createXLSX.name}: ${e}`);
+		console.error(`Ошибка ${createXLSX.name}: ${e}`);
 	} finally {
 		console.log(`\nОбработано уникальных товаров для каталога ${fileName}: ${CACHE.CURRENT.item}`);
 	}
 }
 
-async function fillContent(dataGenerator, sheet) {
+async function fillContent({ dataGenerator, sheet, sheetUpdatedOnly, limitItemsNumber = -1 }) {
 	const autoWidthColumns = getAutoWidthColumns();
 	let i = 1;
 
 	try {
+		const existingItems = await getExistingItemsIds('url');
+
 		for await (const item of dataGenerator) {
+			const url = item.url;
 			const sku = item.sku;
 			const category = item.category;
 
-			if (category !== undefined) {
-				if (sku === undefined) {
-					const row = CACHE.items.get(item.url) + 1;
+			if (category !== undefined && sku === undefined) {
+				const row = CACHE.items.get(url) + 1;
+				let currentLength;
+
+				[sheet, sheetUpdatedOnly].forEach(sheet => {
 					const cell = sheet.getRow(row).getCell('category');
 
 					cell.value += `|${category}`;
+					currentLength = cell.text.length;
+				});
 
-					const currentLength = cell.text.length;
-
-					if (currentLength > autoWidthColumns['category']) {
-						autoWidthColumns['category'] = currentLength;
-					}
-
-					continue;
+				if (currentLength > autoWidthColumns['category']) {
+					autoWidthColumns['category'] = currentLength;
 				}
 
-				if (CACHE.SKUs.has(sku)) {
-					console.log(`Повторяющийся артикул в строке ${CACHE.CURRENT.item + 1}: ${sku}\n`);
-					CACHE.itemsNoSKU.set(item.url, 'Повторяющийся артикул');
-				} else if (sku !== '') {
-					CACHE.SKUs.add(sku);
-				}
+				continue;
 			}
 
-			sheet.addRow(
-				Object.assign(
-					item,
-					{ reason: CACHE.itemsNoSKU.get(item.url) },
-					{ type: 'simple' },
-				)
+			const fullItemInfo = Object.assign(
+				item,
+				{ reason: CACHE.itemsNoSKU.get(url) },
+				{ type: 'simple' },
 			);
+
+			sheet.addRow(fullItemInfo);
+			if (!existingItems.has(url)) sheetUpdatedOnly.addRow(fullItemInfo);
 
 			for (const id in autoWidthColumns) {
 				const currentLength = item[id]?.toString().length || 0;
@@ -92,17 +96,54 @@ async function fillContent(dataGenerator, sheet) {
 				if (currentLength > autoWidthColumns[id]) autoWidthColumns[id] = currentLength;
 			}
 
-			// if (i++ >= 3) break;
+			if (~limitItemsNumber && i++ >= limitItemsNumber) break;
 		}
 
 		for (const id in autoWidthColumns) {
-			const column = sheet.getColumn(id);
-			const width = autoWidthColumns[id];
-
-			column.width = width;
+			[sheet, sheetUpdatedOnly].forEach(sheet => {
+				sheet
+					.getColumn(id)
+					.width = autoWidthColumns[id];
+			});
 		}
 	} catch (e) {
-		console.log(`Ошибка ${fillContent.name}: ${e}`);
+		console.error(`Ошибка ${fillContent.name}: ${e}`);
+	}
+}
+
+async function getExistingItemsIds(id) {
+	try {
+		const existingItems = new Set();
+		const workbookFilenames = globIterate(path.join(CACHE.CURRENT.DATA_DIR_NAME, '*.xlsx'));
+
+		for await (const workbookFilename of workbookFilenames) {
+			const values = await getXLSXColumnById(workbookFilename, id);
+
+			values.forEach(id => existingItems.add(id));
+		}
+
+		return existingItems;
+	} catch (e) {
+		console.error(`Ошибка ${getExistingItemsIds.name}: ${e}`);
+	}
+}
+
+async function getXLSXColumnById(filename, id) {
+	try {
+		const workbook = new ExcelJS.Workbook();
+
+		await workbook.xlsx.readFile(filename);
+
+		const sheet = workbook.worksheets[0];
+		sheet.columns = getColumns();
+		const column = sheet?.getColumn(id);
+		const values = column?.values || [];
+
+		values.splice(0, 2);
+
+		return values;
+	} catch (e) {
+		console.error(`Ошибка ${getXLSXColumnById.name}: ${e}`);
 	}
 }
 
