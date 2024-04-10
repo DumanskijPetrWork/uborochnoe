@@ -1,4 +1,4 @@
-import fs from 'fs';
+import fs from 'fs-extra';
 import path from 'path';
 import { URL } from 'url';
 import UserAgent from "user-agents";
@@ -63,27 +63,38 @@ export function noSKU(rawSKU, lineNumber, url) {
 	const regexpExclude = /\b[A-Z]+\b|\b[\d]+(W|L|P|A|V)?\b|\s(для|в)\s.*?\b[A-Z\d]+\b|\(.*?\b[A-Z\d]+\b.*?\)/;
 	const sku = rawSKU.match(regexp)?.filter(str => !regexpExclude.test(str))[0] || rawSKU;
 
-	console.log(`Товар без артикула (строка: ${lineNumber}, вычислено: ${sku}, источник: ${rawSKU})\n`);
+	logger.log(`Товар без артикула (строка: ${lineNumber}, вычислено: ${sku}, источник: ${rawSKU})`);
 	CACHE.itemsNoSKU.set(url, 'Нет артикула');
 
 	return sku;
 }
 
-export function formatCategory(CATALOGUE, url, defaultCategory, replaceAllCategories = false) {
-	const catalogueCategory = CATALOGUE.categories.get(url);
+export function isUniqueSKU(sku, url) {
+	if (!CACHE.SKUs.has(sku) && sku !== '') {
+		CACHE.SKUs.add(sku);
 
-	if (replaceAllCategories) return catalogueCategory || defaultCategory;
-
-	if (catalogueCategory) {
-		CATALOGUE.categories.delete(url);
-
-		return `${catalogueCategory}|${defaultCategory}`;
+		return true;
 	}
 
-	return defaultCategory;
+	logger.log(`Повторяющийся артикул в строке ${CACHE.CURRENT.item + 1}: ${sku}`);
+	CACHE.itemsNoSKU.set(url, 'Повторяющийся артикул');
 }
 
-export function formatPrice(priceString, round = true) {
+export function formatCategory(CATALOGUE, url, defaultCategoryName, replaceAllCategories = false) {
+	const catalogueCategoryName = CATALOGUE.categories.get(url);
+
+	if (replaceAllCategories) return catalogueCategoryName || defaultCategoryName;
+
+	if (catalogueCategoryName) {
+		CATALOGUE.categories.delete(url);
+
+		return `${catalogueCategoryName}|${defaultCategoryName}`;
+	}
+
+	return defaultCategoryName;
+}
+
+export function formatPrice(priceString, { round: round = true, discount: discount = 0 } = {}) {
 	let price = parseInt(priceString.replace(/\s/g, ''));
 
 	if (!price) {
@@ -95,7 +106,7 @@ export function formatPrice(priceString, round = true) {
 		price = Math.ceil(price / n) * n;
 	}
 
-	return price;
+	return price * (100 - discount) / 100;
 }
 
 export function capitalizeString(str) {
@@ -144,7 +155,7 @@ export function createYouTubeIframe(
 		allowfullscreen = true,
 	} = {}
 ) {
-	return `<iframe> allow="${allow.join(';')
+	return `<iframe allow="${allow.join(';')
 		}" ${allowfullscreen ? 'allowfullscreen' : ''
 		} src="${appendSearchParamsToURL(
 			`https://www.youtube.com/embed/${id}`,
@@ -153,7 +164,7 @@ export function createYouTubeIframe(
 				showinfo: 0,
 				autoplay: 1
 			}
-		)}" </iframe>`;
+		)}"></iframe>`;
 }
 
 export const currentDateString = getCurrentDateString();
@@ -165,7 +176,44 @@ function getCurrentDateString() {
 }
 
 function mkdirIfNotExistsSync(...dirs) {
-	for (const dir of dirs) {
-		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+	dirs.forEach(dir => fs.ensureDirSync(dir));
+}
+
+// class PeekableAsyncIterator { // TODO
+// 	constructor(iterator) {
+// 		return (async () => {
+// 			this.iterator = iterator;
+// 			this.peek = await this.iterator.next();
+
+// 			return this;
+// 		})();
+// 	}
+
+// 	async next() {
+// 		const current = this.peek;
+// 		this.peek = await this.iterator.next();
+
+// 		return current;
+// 	}
+
+// 	[Symbol.iterator]() {
+// 		return this; // TODO
+// 	}
+// }
+
+export async function* getIterableValues(asyncIterator, values) {
+	const valuesArray = Array.isArray(values) ? values : [values];
+	const firstCall = await asyncIterator.next();
+
+	if (firstCall.done) {
+		for (const value of valuesArray) yield value;
+
+		return;
+	}
+
+	yield firstCall;
+
+	for await (const value of asyncIterator) {
+		yield value;
 	}
 }
