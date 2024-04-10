@@ -14,5 +14,17 @@ export const config = {
 				[],
 			]),
 		},
+		{
+			name: "cometrussia__prices",
+			url: "https://www.comet-a.ru/catalogue",
+			exceptions: new Set([
+			]),
+			categories: new Map([
+				[],
+			]),
+			SKUs: new Map([
+				[],
+			]),
+		},
 	],
 }

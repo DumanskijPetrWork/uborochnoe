@@ -9,7 +9,7 @@ export const config = {
 				// "https://bffarinelli.com/product/aksessuary/",
 			]),
 			categories: new Map([
-				['Парогенераторы для чистки обуви', 'Парогенераторы для обуви'],
+				['Парогенераторы для чистки обуви', 'Парогенераторы для обуви|Оборудование для химчистки одежды и обуви'],
 				['Аксессуары', 'Аксессуары и запчасти'],
 				['Парогенераторы для дома', 'Парогенераторы>Парогенераторы для дома'],
 				['Парогенераторы для клининга', 'Парогенераторы>Парогенераторы для клининга'],
@@ -27,6 +27,8 @@ export const config = {
 			name: "transmetall",
 			url: "https://www.transmetall.ru/catalog/all-bieffe?limit=30",
 			exceptions: new Set([
+				'https://www.transmetall.ru/catalog/katalog_oborudovaniya/oborudovaniye_dlya_vto/oborudovaniye_dlya_khimchistki_odezhdy_i_obuvi/detail/parogenerator_bieffe_scarpa_vapor_bf4250000s_obuvnoj_31861',
+				'https://www.transmetall.ru/catalog/katalog_oborudovaniya/oborudovaniye_dlya_vto/oborudovaniye_dlya_khimchistki_odezhdy_i_obuvi/detail/parovaya_ustanovka_scarpavapor_no_limits_bf4260000s_8750',
 			]),
 			categories: new Map([
 				['Промышленные парогенераторы', 'Парогенераторы с утюгом'],

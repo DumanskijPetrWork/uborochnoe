@@ -6,6 +6,7 @@ export const config = {
 			name: "lavorpro",
 			url: "https://lavorpro.ru/catalog/",
 			exceptions: new Set([
+				"https://lavorpro.ru/catalog/moyushchie-sredstva/",
 			]),
 			categories: new Map([
 				["Подметальные машины>С ручным приводом", "Подметальные машины>С механическим приводом"],
