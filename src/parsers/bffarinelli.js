@@ -1,11 +1,10 @@
-import * as cheerio from 'cheerio';
-import { fileURLToPath } from 'url';
-import { p } from '../common/puppeteer.js';
-import * as f from '../common/functions.js';
-import * as m from '../common/media.js';
+import * as cheerio from "cheerio";
+import { fileURLToPath } from "url";
+import puppeteerHandler from "../common/puppeteer.js";
+import * as f from "../common/functions.js";
+import downloadImages from "../common/media.js";
 
-import { config } from '../../config/config_biefe.js';
-
+import { config } from "../../config/config_biefe.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const { CATALOGUE, ORIGIN_URL } = f.getCatalogueParams(__filename, config);
@@ -18,7 +17,11 @@ export default {
 
 async function* getData(url, source) {
 	for await (const cardURL of source(url)) {
-		const category = f.formatCategory(CATALOGUE, cardURL, CACHE.CURRENT.category);
+		const category = f.formatCategory(
+			CATALOGUE,
+			cardURL,
+			CACHE.CURRENT.category
+		);
 
 		console.log(`[${CACHE.CURRENT.item + 1}] ${cardURL}`);
 
@@ -28,23 +31,29 @@ async function* getData(url, source) {
 			yield {
 				url: cardURL,
 				category,
-			}
+			};
 
 			continue;
 		}
 
 		try {
-			const pageContent = await p.getPageContent(cardURL);
+			const pageContent = await puppeteerHandler.getPageContent(cardURL);
 			const $ = cheerio.load(pageContent);
 
 			const name = getName($);
 			const sku = getSKU($, cardURL, name);
 			const price = f.formatPrice(getPrice($));
-			const description = f.formatDescription(getDescription($), getDescriptionVideo($));
+			const description = f.formatDescription(
+				getDescription($),
+				getDescriptionVideo($)
+			);
 			const properties = f.formatDescription(getProperties($));
-			const imagesfileNames = m.downloadImages(getImages($), sku, ORIGIN_URL);
+			const images = downloadImages(getImages($), sku);
 			const relatedAccessories = getRelatedAccessories($);
-			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs($, relatedAccessories);
+			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs(
+				$,
+				relatedAccessories
+			);
 
 			if (!(name || sku || price)) {
 				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})`);
@@ -63,9 +72,9 @@ async function* getData(url, source) {
 				name,
 				description,
 				properties,
-				images: imagesfileNames.join(),
+				images,
 				related: relatedAccessoriesSKUs.join(),
-			}
+			};
 		} catch (e) {
 			console.error(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
 		}
@@ -75,7 +84,7 @@ async function* getData(url, source) {
 async function* getCardURL(url) {
 	for await (const pageURL of getPageURL(url)) {
 		try {
-			const pageContent = await p.getPageContent(pageURL);
+			const pageContent = await puppeteerHandler.getPageContent(pageURL);
 			const $ = cheerio.load(pageContent);
 
 			for (const url of getCardsURLs($)) {
@@ -90,7 +99,9 @@ async function* getCardURL(url) {
 async function* getPageURL(url) {
 	for await (const categoryURL of getCategoryURL(url)) {
 		try {
-			const pageContent = await p.getPageContent(categoryURL);
+			const pageContent = await puppeteerHandler.getPageContent(
+				categoryURL
+			);
 			const $ = cheerio.load(pageContent);
 
 			for (let n = 1; n <= getMaxPageNumber($); n++) {
@@ -104,14 +115,18 @@ async function* getPageURL(url) {
 
 async function* getCategoryURL(url, parentCategoryName) {
 	try {
-		const pageContent = await p.getPageContent(url);
+		const pageContent = await puppeteerHandler.getPageContent(url);
 		const $ = cheerio.load(pageContent);
 		const categories = getCategories($)
-			.map(category => ({
+			.map((category) => ({
 				categoryURL: getURLOfCategory($, category),
-				categoryFullName: getFullNameOfCategory($, category, parentCategoryName),
+				categoryFullName: getFullNameOfCategory(
+					$,
+					category,
+					parentCategoryName
+				),
 			}))
-			.filter(category => category.categoryURL);
+			.filter((category) => category.categoryURL);
 
 		if (!categories.length) {
 			getCategoryURL.hasSubCategories = false;
@@ -139,113 +154,99 @@ async function* getCategoryURL(url, parentCategoryName) {
 }
 
 function getName($) {
-	return $('h1#pagetitle')
-		?.text()
-		|| '';
+	return $("h1#pagetitle")?.text() || "";
 }
 
 function getSKU($, fullURL, name) {
 	const nameTranslit = f.cyrillicToTranslit(name);
-	const sku = $('span.article span.js-replace-article')
-		?.first()
-		?.text()
-		|| f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
+	const sku =
+		$("span.article span.js-replace-article")?.first()?.text() ||
+		f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
 
-	return CATALOGUE.SKUs.get(fullURL)
-		|| CATALOGUE.SKUs.get(sku)
-		|| f.isUniqueSKU(sku, fullURL) ? sku : `${sku} - ${nameTranslit}`;
+	return CATALOGUE.SKUs.get(fullURL) ||
+		CATALOGUE.SKUs.get(sku) ||
+		f.isUniqueSKU(sku, fullURL)
+		? sku
+		: `${sku} - ${nameTranslit}`;
 }
 
 function getPrice($) {
-	return $('div.catalog-detail__right-info span.price__new-val')
-		?.attr('content')
-		|| '';
+	return (
+		$("div.catalog-detail__right-info span.price__new-val")?.attr(
+			"content"
+		) || ""
+	);
 }
 
 function getDescription($) {
-	return $('div#desc div.content')
-		?.html()
-		?.trim()
-		|| '';
+	return $("div#desc div.content")?.html()?.trim() || "";
 }
 
 function getDescriptionVideo($) {
-	const video = $('div#video iframe')
-		?.parent()
-		?.html()
-		?.trim()
-		|| '';
+	const video = $("div#video iframe")?.parent()?.html()?.trim() || "";
 
 	return video ? video + `<br>` : video;
 }
 
 function getProperties($) {
-	return $('div#char div.props_block')
-		?.html()
-		?.trim()
-		|| '';
+	return $("div#char div.props_block")?.html()?.trim() || "";
 }
 
 function getImages($) {
-	return $('div.big div.owl-stage a')
-		?.add('div.big_gallery div.gallery-small a')
-		?.map((i, elem) => $(elem).attr('href'))
-		?.toArray()
-		|| [];
+	return (
+		$("div.big div.owl-stage a")
+			?.add("div.big_gallery div.gallery-small a")
+			?.map((i, elem) => ORIGIN_URL + $(elem).attr("href"))
+			?.toArray() || []
+	);
 }
 
 function getRelatedAccessories($) {
-	return $('div.catalog-detail__bottom-info div.goods div.catalog-block div.catalog-block__info-title a');
+	return $(
+		"div.catalog-detail__bottom-info div.goods div.catalog-block div.catalog-block__info-title a"
+	);
 }
 
 function getRelatedAccessoriesSKUs($, relatedAccessories) {
-	const SKUs = relatedAccessories
-		?.find('span')
-		?.map((i, elem) => $(elem)
-			?.text()
-			?.replace(/^.+-/s, '')
-			?.trim()
-			|| '')
-		?.toArray()
-		?.map(sku => CATALOGUE.SKUs.get(sku) || sku)
-		|| [];
+	const SKUs =
+		relatedAccessories
+			?.find("span")
+			?.map(
+				(i, elem) => $(elem)?.text()?.replace(/^.+-/s, "")?.trim() || ""
+			)
+			?.toArray()
+			?.map((sku) => CATALOGUE.SKUs.get(sku) || sku) || [];
 
 	return [...new Set(SKUs)];
-
 }
 
 function getCardsURLs($) {
-	const cards = $('div.catalog-items')
-		.find('div.catalog-block__info-title a');
+	const cards = $("div.catalog-items").find(
+		"div.catalog-block__info-title a"
+	);
 
 	return cards
-		.map((i, elem) => ORIGIN_URL + $(elem).attr('href'))
+		.map((i, elem) => ORIGIN_URL + $(elem).attr("href"))
 		.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
 		.toArray();
 }
 
 function getMaxPageNumber($) {
-	return $('div.module-pagination div.nums>a')
-		?.last()
-		?.text() || 1;
+	return $("div.module-pagination div.nums>a")?.last()?.text() || 1;
 }
 
 function getLinkToPageN(originURL, n) {
-	return f.appendSearchParamsToURL(
-		originURL,
-		{
-			PAGEN_1: n,
-		}
-	);
+	return f.appendSearchParamsToURL(originURL, {
+		PAGEN_1: n,
+	});
 }
 
 function getCategories($) {
-	return $('div.sections-list div.sections-list__item a.dark_link')
-		.toArray();
+	return $("div.sections-list div.sections-list__item a.dark_link").toArray();
 }
 
 function getURLOfCategory($, category) {
-	const categoryURL = ORIGIN_URL + $(category).attr('href');
+	const categoryURL = ORIGIN_URL + $(category).attr("href");
 
 	if (CACHE.categoriesURLs.has(categoryURL)) {
 		return;
@@ -257,10 +258,12 @@ function getURLOfCategory($, category) {
 }
 
 function getFullNameOfCategory($, category, parentCategoryName) {
-	const categoryOwnNameRaw = $(category)
-		.text();
-	const categoryOwnName = CATALOGUE.categories.get(categoryOwnNameRaw) || categoryOwnNameRaw;
-	const categoryFullNameRaw = parentCategoryName ? parentCategoryName + '>' + categoryOwnName : categoryOwnName;
+	const categoryOwnNameRaw = $(category).text();
+	const categoryOwnName =
+		CATALOGUE.categories.get(categoryOwnNameRaw) || categoryOwnNameRaw;
+	const categoryFullNameRaw = parentCategoryName
+		? parentCategoryName + ">" + categoryOwnName
+		: categoryOwnName;
 
 	return CATALOGUE.categories.get(categoryFullNameRaw) || categoryFullNameRaw;
 }
