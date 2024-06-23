@@ -45,7 +45,7 @@ const getImageStream = async function requestImageReadableDataStreamByURL(url) {
 			url,
 			responseType: "stream",
 		},
-		"image"
+		["image", "application"]
 	);
 
 	if (!response) return;

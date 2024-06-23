@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 
 class AxiosHandler {
-	constructor(timeout = 1000) {
+	constructor(timeout = 0) {
 		this.timeout = timeout;
 	}
 
@@ -23,19 +23,29 @@ class AxiosHandler {
 		}
 	}
 
-	async requestTypedContent(options, typeString, timeout = this.timeout) {
+	async requestTypedContent(
+		options,
+		allowedTypesArray,
+		timeout = this.timeout
+	) {
 		try {
 			const response = await this.request(options, timeout);
 
 			if (!response) return;
 
-			const { headers } = response;
-			const contentLength = headers["content-length"];
-			const contentType = headers["content-type"];
+			const {
+				headers: {
+					"content-type": contentType,
+					"content-length": contentLength,
+				},
+			} = response;
+			const matchAllowedType = allowedTypesArray.some((type) =>
+				contentType.startsWith(type)
+			);
 
-			if (!contentType.startsWith(typeString)) {
+			if (!matchAllowedType) {
 				throw new AxiosError(
-					`Wrong data type (type: ${contentType}, expected: ${typeString})`
+					`Wrong data type (type: ${contentType}, expected: ${allowedTypesArray})`
 				);
 			}
 
