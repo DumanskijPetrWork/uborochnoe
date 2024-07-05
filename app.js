@@ -1,7 +1,6 @@
-import { p } from './src/common/puppeteer.js'
-import { createDataBase } from './src/common/database.js'
-import Cache from './src/common/cache.js';
-
+import puppeteerHandler from "./src/common/puppeteer.js";
+import { createDataBase } from "./src/common/database.js";
+import Cache from "./src/common/cache.js";
 
 class App {
 	async main() {
@@ -12,10 +11,14 @@ class App {
 		} catch (e) {
 			console.error(`Ошибка ${this.main.name}: ${e}`);
 		} finally {
-			await p.closeBrowser();
+			await puppeteerHandler.closeBrowser();
 			const execTime = new Date(Date.now() - startTimestamp);
-			execTime.setMinutes(execTime.getMinutes() + execTime.getTimezoneOffset());
-			console.log(`Время выполнения: ${(execTime.getHours())} ч. ${(execTime.getMinutes())} мин. ${(execTime.getSeconds())} с.`);
+			execTime.setMinutes(
+				execTime.getMinutes() + execTime.getTimezoneOffset()
+			);
+			console.log(
+				`Время выполнения: ${execTime.getHours()} ч. ${execTime.getMinutes()} мин. ${execTime.getSeconds()} с.`
+			);
 		}
 	}
 }

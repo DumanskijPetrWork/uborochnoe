@@ -1,24 +1,33 @@
 import ExcelJS from 'exceljs';
 import fs from 'fs';
 import path from 'path';
-import { globSync } from 'glob';
 
 import PARSERS from '../../config/parsers.js';
 import * as f from './functions.js';
-
+import globHandler from './glob.js';
 
 await createVariations();
 
 async function createVariations() {
 	try {
 		for (const parser of PARSERS) {
-			const variationsFilePath = path.resolve('dist', '*', parser.name, 'variations', '*.xlsx');
-			const parsedFilesPathes = globSync(
+			const variationsFilePath = path.resolve(
+				'dist',
+				'*',
+				parser.name,
+				'variations',
+				'*.xlsx'
+			);
+			const parsedFilesPathes = globHandler.parsePathes(
 				path.resolve(variationsFilePath, '..', '..', '*.xlsx'),
-				{ 'ignore': { ignored: p => /related|with_variations/.test(p.name) } }
+				{
+					ignore: {
+						ignored: (p) => /related|with_variations/.test(p.name),
+					},
+				}
 			);
 
-			for (const file of globSync(variationsFilePath)) {
+			for (const file of globHandler.parsePathes(variationsFilePath)) {
 				await variationsToJSON(file);
 			}
 
@@ -32,7 +41,9 @@ async function createVariations() {
 }
 
 async function addVariations(filePath) {
-	const variationsFilePath = globSync(path.resolve(filePath, '..', 'variations', '*.json'));
+	const variationsFilePath = globHandler.parsePathes(
+		path.resolve(filePath, '..', 'variations', '*.json')
+	);
 	if (!variationsFilePath.length) return;
 
 	try {
@@ -43,29 +54,35 @@ async function addVariations(filePath) {
 
 		const worksheet = workbook.worksheets[0];
 
-		worksheet.getRow(1).values.forEach((value, i) => { worksheet.getColumn(i).key = value })
+		worksheet.getRow(1).values.forEach((value, i) => {
+			worksheet.getColumn(i).key = value;
+		});
 
 		for (const [sku, variations] of Object.entries(data)) {
-			let currentRowIndex = worksheet.getColumn('sku').values.findIndex((cell) => cell?.includes(sku));
+			let currentRowIndex = worksheet
+				.getColumn('sku')
+				.values.findIndex((cell) => cell?.includes(sku));
 
 			if (currentRowIndex == -1) continue;
 
 			f.setCellsValues(worksheet, currentRowIndex, {
-				'type': 'variable',
-				'price': '',
+				type: 'variable',
+				price: '',
 			});
 
 			worksheet.duplicateRow(currentRowIndex, variations.length, true);
 
 			for (const variation of variations) {
 				f.setCellsValues(worksheet, ++currentRowIndex, {
-					'variation': variation.variation,
-					'price': variation.price,
+					variation: variation.variation,
+					price: variation.price,
 				});
 			}
 		}
 
-		await workbook.xlsx.writeFile(f.changeFileName(filePath, 'with_variations', 'xlsx'));
+		await workbook.xlsx.writeFile(
+			f.changeFileName(filePath, 'with_variations', 'xlsx')
+		);
 	} catch (e) {
 		console.error(`Ошибка ${addVariations.name}: ${e}`);
 	}
@@ -80,7 +97,9 @@ async function variationsToJSON(filePath) {
 
 		const worksheet = workbook.worksheets[0];
 
-		worksheet.getRow(1).values.forEach((value, i) => { worksheet.getColumn(i).key = value })
+		worksheet.getRow(1).values.forEach((value, i) => {
+			worksheet.getColumn(i).key = value;
+		});
 
 		for (let i = 2; i <= worksheet.rowCount; i++) {
 			const row = worksheet.getRow(i);
@@ -104,7 +123,10 @@ async function variationsToJSON(filePath) {
 
 		const json = JSON.stringify(Object.fromEntries(variations));
 
-		fs.writeFileSync(f.changeFileName(filePath, 'variations', 'json'), json);
+		fs.writeFileSync(
+			f.changeFileName(filePath, 'variations', 'json'),
+			json
+		);
 	} catch (e) {
 		console.error(`Ошибка ${variationsToJSON.name}: ${e}`);
 	}
