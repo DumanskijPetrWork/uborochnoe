@@ -1,269 +1,134 @@
-import * as cheerio from "cheerio";
-import { fileURLToPath } from "url";
-import puppeteerHandler from "../common/puppeteer.js";
+import { AbstractParser } from "../common/abstractParser.js";
 import * as f from "../common/functions.js";
-import downloadImages from "../common/media.js";
 
-import { config } from "../../config/config_biefe.js";
+export default class Parser extends AbstractParser {
+	_getCategoryFullName(url) {
+		return f.formatCategory(this._CATALOGUE, url, CACHE.CURRENT.category);
+	}
 
-const __filename = fileURLToPath(import.meta.url);
-const { CATALOGUE, ORIGIN_URL } = f.getCatalogueParams(__filename, config);
+	_getName($) {
+		return $("h1#pagetitle")?.text() || "";
+	}
 
-export default {
-	config,
-	name: CATALOGUE.name,
-	dataGenerator: getData(CATALOGUE.url, getCardURL),
-};
+	_getSKU($, fullURL, name) {
+		const nameTranslit = f.cyrillicToTranslit(name);
+		const sku =
+			$("span.article span.js-replace-article")?.first()?.text() ||
+			f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
 
-async function* getData(url, source) {
-	for await (const cardURL of source(url)) {
-		const category = f.formatCategory(
-			CATALOGUE,
-			cardURL,
-			CACHE.CURRENT.category
+		return this._CATALOGUE.SKUs.get(fullURL) ||
+			this._CATALOGUE.SKUs.get(sku) ||
+			f.isUniqueSKU(sku, fullURL)
+			? sku
+			: `${sku} - ${nameTranslit}`;
+	}
+
+	_getPrice($) {
+		return (
+			$("div.catalog-detail__right-info span.price__new-val")?.attr(
+				"content"
+			) || ""
+		);
+	}
+
+	_getDescription($) {
+		return $("div#desc div.content")?.html()?.trim() || "";
+	}
+
+	_getDescriptionVideo($) {
+		const video = $("div#video iframe")?.parent()?.html()?.trim() || "";
+
+		return video ? video + `<br>` : video;
+	}
+
+	_getProperties($) {
+		return $("div#char div.props_block")?.html()?.trim() || "";
+	}
+
+	_getDocs() {
+		return "";
+	}
+
+	_getImages($) {
+		return (
+			$("div.big div.owl-stage a")
+				?.add("div.big_gallery div.gallery-small a")
+				?.map((i, elem) => this._ORIGIN_URL + $(elem).attr("href"))
+				?.toArray() || []
+		);
+	}
+
+	_getCardsURLs($) {
+		const cards = $("div.catalog-items").find(
+			"div.catalog-block__info-title a"
 		);
 
-		console.log(`[${CACHE.CURRENT.item + 1}] ${cardURL}`);
-
-		if (CACHE.items.has(cardURL)) {
-			console.log(`Новая категория для товара: ${category}\n`);
-
-			yield {
-				url: cardURL,
-				category,
-			};
-
-			continue;
-		}
-
-		try {
-			const pageContent = await puppeteerHandler.getPageContent(cardURL);
-			const $ = cheerio.load(pageContent);
-
-			const name = getName($);
-			const sku = getSKU($, cardURL, name);
-			const price = f.formatPrice(getPrice($));
-			const description = f.formatDescription(
-				getDescription($),
-				getDescriptionVideo($)
-			);
-			const properties = f.formatDescription(getProperties($));
-			const images = downloadImages(getImages($), sku);
-			const relatedAccessories = getRelatedAccessories($);
-			const relatedAccessoriesSKUs = getRelatedAccessoriesSKUs(
-				$,
-				relatedAccessories
-			);
-
-			if (!(name || sku || price)) {
-				logger.log(`ПУСТАЯ КАРТОЧКА ТОВАРА! (url: ${cardURL})`);
-				continue;
-			}
-
-			CACHE.items.set(cardURL, ++CACHE.CURRENT.item);
-
-			await f.delay(300);
-
-			yield {
-				url: cardURL,
-				sku,
-				price,
-				category,
-				name,
-				description,
-				properties,
-				images,
-				related: relatedAccessoriesSKUs.join(),
-			};
-		} catch (e) {
-			console.error(`Ошибка ${getData.name} (url: ${cardURL}): ${e}`);
-		}
+		return cards
+			.map((i, elem) => this._ORIGIN_URL + $(elem).attr("href"))
+			.filter((i, elem) => !this._CATALOGUE.exceptions.has(elem))
+			.toArray();
 	}
-}
 
-async function* getCardURL(url) {
-	for await (const pageURL of getPageURL(url)) {
-		try {
-			const pageContent = await puppeteerHandler.getPageContent(pageURL);
-			const $ = cheerio.load(pageContent);
-
-			for (const url of getCardsURLs($)) {
-				yield url;
-			}
-		} catch (e) {
-			console.error(`Ошибка ${getCardURL.name}: ${e}`);
-		}
+	_getMaxPageNumber($) {
+		return $("div.module-pagination div.nums>a")?.last()?.text() || 1;
 	}
-}
 
-async function* getPageURL(url) {
-	for await (const categoryURL of getCategoryURL(url)) {
-		try {
-			const pageContent = await puppeteerHandler.getPageContent(
-				categoryURL
-			);
-			const $ = cheerio.load(pageContent);
-
-			for (let n = 1; n <= getMaxPageNumber($); n++) {
-				yield getLinkToPageN(categoryURL, n);
-			}
-		} catch (e) {
-			console.error(`Ошибка ${getPageURL.name}: ${e}`);
-		}
+	_getLinkToPageN(originURL, n) {
+		return f.appendSearchParamsToURL(originURL, {
+			PAGEN_1: n,
+		});
 	}
-}
 
-async function* getCategoryURL(url, parentCategoryName) {
-	try {
-		const pageContent = await puppeteerHandler.getPageContent(url);
-		const $ = cheerio.load(pageContent);
-		const categories = getCategories($)
-			.map((category) => ({
-				categoryURL: getURLOfCategory($, category),
-				categoryFullName: getFullNameOfCategory(
-					$,
-					category,
-					parentCategoryName
-				),
-			}))
-			.filter((category) => category.categoryURL);
+	_getCategories($) {
+		return $(
+			"div.sections-list div.sections-list__item a.dark_link"
+		).toArray();
+	}
 
-		if (!categories.length) {
-			getCategoryURL.hasSubCategories = false;
+	_getURLOfCategory($, category) {
+		const categoryURL = this._ORIGIN_URL + $(category).attr("href");
+
+		if (CACHE.categoriesURLs.has(categoryURL)) {
 			return;
+		} else {
+			CACHE.categoriesURLs.add(categoryURL);
 		}
 
-		for (const { categoryURL, categoryFullName } of categories) {
-			yield* getCategoryURL(categoryURL, categoryFullName);
-
-			if (getCategoryURL.hasSubCategories) {
-				continue;
-			} else {
-				getCategoryURL.hasSubCategories = true;
-			}
-
-			CACHE.CURRENT.category = categoryFullName;
-
-			if (!CATALOGUE.exceptions.has(categoryURL)) {
-				yield categoryURL;
-			}
-		}
-	} catch (e) {
-		console.error(`Ошибка ${getCategoryURL.name}: ${e}`);
-	}
-}
-
-function getName($) {
-	return $("h1#pagetitle")?.text() || "";
-}
-
-function getSKU($, fullURL, name) {
-	const nameTranslit = f.cyrillicToTranslit(name);
-	const sku =
-		$("span.article span.js-replace-article")?.first()?.text() ||
-		f.noSKU(name, CACHE.CURRENT.item + 2, fullURL);
-
-	return CATALOGUE.SKUs.get(fullURL) ||
-		CATALOGUE.SKUs.get(sku) ||
-		f.isUniqueSKU(sku, fullURL)
-		? sku
-		: `${sku} - ${nameTranslit}`;
-}
-
-function getPrice($) {
-	return (
-		$("div.catalog-detail__right-info span.price__new-val")?.attr(
-			"content"
-		) || ""
-	);
-}
-
-function getDescription($) {
-	return $("div#desc div.content")?.html()?.trim() || "";
-}
-
-function getDescriptionVideo($) {
-	const video = $("div#video iframe")?.parent()?.html()?.trim() || "";
-
-	return video ? video + `<br>` : video;
-}
-
-function getProperties($) {
-	return $("div#char div.props_block")?.html()?.trim() || "";
-}
-
-function getImages($) {
-	return (
-		$("div.big div.owl-stage a")
-			?.add("div.big_gallery div.gallery-small a")
-			?.map((i, elem) => ORIGIN_URL + $(elem).attr("href"))
-			?.toArray() || []
-	);
-}
-
-function getRelatedAccessories($) {
-	return $(
-		"div.catalog-detail__bottom-info div.goods div.catalog-block div.catalog-block__info-title a"
-	);
-}
-
-function getRelatedAccessoriesSKUs($, relatedAccessories) {
-	const SKUs =
-		relatedAccessories
-			?.find("span")
-			?.map(
-				(i, elem) => $(elem)?.text()?.replace(/^.+-/s, "")?.trim() || ""
-			)
-			?.toArray()
-			?.map((sku) => CATALOGUE.SKUs.get(sku) || sku) || [];
-
-	return [...new Set(SKUs)];
-}
-
-function getCardsURLs($) {
-	const cards = $("div.catalog-items").find(
-		"div.catalog-block__info-title a"
-	);
-
-	return cards
-		.map((i, elem) => ORIGIN_URL + $(elem).attr("href"))
-		.filter((i, elem) => !CATALOGUE.exceptions.has(elem))
-		.toArray();
-}
-
-function getMaxPageNumber($) {
-	return $("div.module-pagination div.nums>a")?.last()?.text() || 1;
-}
-
-function getLinkToPageN(originURL, n) {
-	return f.appendSearchParamsToURL(originURL, {
-		PAGEN_1: n,
-	});
-}
-
-function getCategories($) {
-	return $("div.sections-list div.sections-list__item a.dark_link").toArray();
-}
-
-function getURLOfCategory($, category) {
-	const categoryURL = ORIGIN_URL + $(category).attr("href");
-
-	if (CACHE.categoriesURLs.has(categoryURL)) {
-		return;
-	} else {
-		CACHE.categoriesURLs.add(categoryURL);
+		return categoryURL;
 	}
 
-	return categoryURL;
-}
+	_getFullNameOfCategory($, category, parentCategoryName) {
+		const categoryOwnNameRaw = $(category).text();
+		const categoryOwnName =
+			this._CATALOGUE.categories.get(categoryOwnNameRaw) ||
+			categoryOwnNameRaw;
+		const categoryFullNameRaw = parentCategoryName
+			? parentCategoryName + ">" + categoryOwnName
+			: categoryOwnName;
 
-function getFullNameOfCategory($, category, parentCategoryName) {
-	const categoryOwnNameRaw = $(category).text();
-	const categoryOwnName =
-		CATALOGUE.categories.get(categoryOwnNameRaw) || categoryOwnNameRaw;
-	const categoryFullNameRaw = parentCategoryName
-		? parentCategoryName + ">" + categoryOwnName
-		: categoryOwnName;
+		return (
+			this._CATALOGUE.categories.get(categoryFullNameRaw) ||
+			categoryFullNameRaw
+		);
+	}
 
-	return CATALOGUE.categories.get(categoryFullNameRaw) || categoryFullNameRaw;
+	_getRelated($) {
+		return $(
+			"div.catalog-detail__bottom-info div.goods div.catalog-block div.catalog-block__info-title a"
+		);
+	}
+
+	_getRelatedSKUs($, related) {
+		const SKUs =
+			related
+				?.find("span")
+				?.map(
+					(i, elem) =>
+						$(elem)?.text()?.replace(/^.+-/s, "")?.trim() || ""
+				)
+				?.toArray()
+				?.map((sku) => this._CATALOGUE.SKUs.get(sku) || sku) || [];
+
+		return [...new Set(SKUs)].join();
+	}
 }
