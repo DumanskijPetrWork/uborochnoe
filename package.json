@@ -26,6 +26,10 @@
     "user-agents": "^1.1.44"
   },
   "devDependencies": {
-    "eslint": "^8.54.0"
+    "@types/node": "^20.12.12",
+    "eslint": "^8.54.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-security": "^3.0.0",
+    "npm-check-updates": "^16.14.20"
   }
 }
