@@ -8,5 +8,5 @@ export const IMG_RESIZE_OPTS = {
 
 export const IMG_FORMAT_OPTS = {
 	quality: 80,
-	extname: 'webp',
+	extname: "webp",
 };
