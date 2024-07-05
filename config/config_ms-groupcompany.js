@@ -1,13 +1,10 @@
 // Подключение каталогов
 export default {
-	SITE_URL: 'https://ghibli.info/',
+	SITE_URL: "https://ms-groupcompany.ru/",
 	CATALOGUES: [
 		{
-			name: 'ghiblirussia',
-			url: [
-				'https://ghiblirussia.com/catalog/',
-				'https://ghiblirussia.com/katalog-KRUGER/',
-			],
+			name: "aquatecnica",
+			url: "https://www.aquatecnica.ru/category/",
 			exceptions: new Set([]),
 			categories: new Map([[]]),
 			SKUs: new Map([[]]),
