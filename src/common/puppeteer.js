@@ -1,10 +1,12 @@
 import puppeteer from "puppeteer";
-import { getNewUserAgentString } from "./functions.js"
-import { LAUNCH_PUPPETEER_OPTS, PAGE_PUPPETEER_OPTS } from "../../config/puppeteer_options.js";
-
+import { getNewUserAgentString } from "./functions.js";
+import {
+	LAUNCH_PUPPETEER_OPTS,
+	PAGE_PUPPETEER_OPTS,
+} from "../../config/puppeteer_options.js";
 
 class PuppeteerHandler {
-	disableRequests = ['stylesheet', 'font', 'image'];
+	disableRequests = ["stylesheet", "font", "image"];
 
 	constructor() {
 		this.browser = null;
@@ -13,18 +15,18 @@ class PuppeteerHandler {
 	async initBrowser() {
 		try {
 			this.browser = await puppeteer.launch(LAUNCH_PUPPETEER_OPTS);
-			console.log('* Puppeteer запущен *');
+			console.log("* Puppeteer запущен *");
 		} catch (e) {
-			console.error(`Ошибка ${this.initBrowser.name}: ${e}`);
+			console.error(`Ошибка puppeteer initBrowser: ${e}`);
 		}
 	}
 
 	async closeBrowser() {
 		if (this.browser) {
 			await this.browser.close();
-			console.log('\n* Puppeteer успешно завершил работу *\n');
+			console.log("\n* Puppeteer успешно завершил работу *\n");
 		} else {
-			console.error('\n* Puppeteer не использовался *\n');
+			console.error("\n* Puppeteer не использовался *\n");
 		}
 	}
 
@@ -38,8 +40,11 @@ class PuppeteerHandler {
 			await page.setUserAgent(getNewUserAgentString());
 
 			await page.setRequestInterception(true);
-			page.on('request',
-				(req) => this.disableRequests.includes(req.resourceType()) ? req.abort() : req.continue());
+			page.on("request", (req) =>
+				this.disableRequests.includes(req.resourceType())
+					? req.abort()
+					: req.continue()
+			);
 
 			await page.goto(url, PAGE_PUPPETEER_OPTS);
 			const content = await page.content();
@@ -47,9 +52,9 @@ class PuppeteerHandler {
 
 			return content;
 		} catch (e) {
-			console.error(`Ошибка ${this.getPageContent.name}: ${e}`);
+			console.error(`Ошибка puppeteer getPageContent: ${e}`);
 		}
 	}
 }
 
-export const p = new PuppeteerHandler();
+export default new PuppeteerHandler();
